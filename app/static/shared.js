@@ -7,7 +7,7 @@ function toggleDarkMode() {
 }
 
 // Apply saved theme on load
-(function() {
+(function () {
     if (localStorage.getItem('darkMode') === '1') {
         document.body.classList.add('dark');
         const btn = document.querySelector('.theme-toggle');
@@ -21,10 +21,15 @@ function openResource(path) {
         .then(r => r.json())
         .then(data => {
             if (data.status === 'cloud') {
+                if (data.onedrive_url) {
+                    // Open OneDrive link in a new tab
+                    window.open(data.onedrive_url, '_blank');
+                }
+                // Also copy path as fallback
                 navigator.clipboard.writeText(path).then(() => {
                     const toast = document.getElementById('copyToast');
                     if (toast) {
-                        toast.textContent = 'Path copied! Find this file in your OneDrive.';
+                        toast.textContent = 'Opening in OneDrive... Path also copied!';
                         toast.classList.add('show');
                         setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 3000);
                     }
@@ -78,7 +83,7 @@ function toggleBookmark(path, filename, source, fileType, btn) {
 }
 
 // Restore bookmark states on page load
-(function() {
+(function () {
     document.querySelectorAll('.action-icon[title="Bookmark"]').forEach(btn => {
         // Extract path from the onclick attribute of the parent resource-item
         const item = btn.closest('.resource-item');
@@ -199,7 +204,7 @@ function renderRecentSearches() {
 }
 
 // === Keyboard Shortcuts ===
-document.addEventListener('keydown', function(e) {
+document.addEventListener('keydown', function (e) {
     // "/" to focus search
     if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
         const input = document.querySelector('.search-input');

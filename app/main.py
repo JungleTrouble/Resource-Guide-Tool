@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.config import IS_CLOUD, RESOURCES_DIR, UPLOAD_DIR
+from app.config import IS_CLOUD, ONEDRIVE_CID, RESOURCES_DIR, UPLOAD_DIR
 from app.embeddings import clear_index, get_index_count, get_source_counts, index_resources
 from app.indexer import scan_resources
 from app.recommender import recommend, recommend_multi, search_resources
@@ -190,8 +190,24 @@ async def open_file(path: str = ""):
         return JSONResponse({"error": "No path provided"}, status_code=400)
 
     if IS_CLOUD:
-        # On Replit/cloud, we can't open local files — just show the path
-        return JSONResponse({"status": "cloud", "path": path, "message": "File path copied. Open this file from your OneDrive."})
+        # Build a OneDrive link from the relative path
+        # The path is relative to RESOURCES_DIR (e.g., "Sketchy/Pharmacology/video.mp4")
+        # Convert backslashes to forward slashes for URL
+        clean_path = path.replace("\\", "/")
+        # URL-encode the path for OneDrive
+        from urllib.parse import quote
+        onedrive_folder = "/".join(clean_path.split("/")[:-1])  # parent folder
+        if ONEDRIVE_CID:
+            onedrive_url = f"https://onedrive.live.com/?cid={ONEDRIVE_CID}&id=root&path=/{quote(clean_path)}"
+        else:
+            # Fallback: open OneDrive root — user can navigate from there
+            onedrive_url = f"https://onedrive.live.com/"
+        return JSONResponse({
+            "status": "cloud",
+            "path": path,
+            "onedrive_url": onedrive_url,
+            "message": "Opening in OneDrive...",
+        })
 
     # Resolve the full path within the resources directory
     full_path = RESOURCES_DIR / path

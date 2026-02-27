@@ -16,6 +16,10 @@ else:
 # Detect if running on Replit (no local resource files available)
 IS_CLOUD = os.environ.get("REPL_ID") is not None or os.environ.get("RENDER") is not None
 
+# OneDrive sharing — set ONEDRIVE_CID env var to your OneDrive account CID
+# to allow direct links to files. Find your CID at https://onedrive.live.com → look at the URL.
+ONEDRIVE_CID = os.environ.get("ONEDRIVE_CID", "")
+
 # Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 INDEX_DIR.mkdir(parents=True, exist_ok=True)
