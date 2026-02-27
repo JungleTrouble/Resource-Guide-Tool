@@ -16,5 +16,8 @@ data/uploads/
 .DS_Store
 Thumbs.db
 
+# Index data (generated at runtime)
+data/index/
+
 # Claude
 .claude/

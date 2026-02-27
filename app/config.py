@@ -14,7 +14,7 @@ else:
     RESOURCES_DIR = Path(r"C:\Users\micha\OneDrive\MedSchoolPlug")
 
 # Detect if running on Replit (no local resource files available)
-IS_CLOUD = os.environ.get("REPL_ID") is not None
+IS_CLOUD = os.environ.get("REPL_ID") is not None or os.environ.get("RENDER") is not None
 
 # Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
