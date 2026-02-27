@@ -5,10 +5,7 @@ from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from app.config import CHROMA_DIR, EMBEDDING_MODEL, RESULTS_PER_TOPIC
-
-# Paths for persisted index
-INDEX_DIR = CHROMA_DIR
+from app.config import INDEX_DIR, EMBEDDING_MODEL, RESULTS_PER_TOPIC
 EMBEDDINGS_FILE = INDEX_DIR / "embeddings.npy"
 METADATA_FILE = INDEX_DIR / "metadata.json"
 

@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.config import RESOURCES_DIR, UPLOAD_DIR
+from app.config import IS_CLOUD, RESOURCES_DIR, UPLOAD_DIR
 from app.embeddings import clear_index, get_index_count, get_source_counts, index_resources
 from app.indexer import scan_resources
 from app.recommender import recommend, recommend_multi, search_resources
@@ -188,6 +188,10 @@ async def open_file(path: str = ""):
     """Open a resource file using the system default application."""
     if not path:
         return JSONResponse({"error": "No path provided"}, status_code=400)
+
+    if IS_CLOUD:
+        # On Replit/cloud, we can't open local files — just show the path
+        return JSONResponse({"status": "cloud", "path": path, "message": "File path copied. Open this file from your OneDrive."})
 
     # Resolve the full path within the resources directory
     full_path = RESOURCES_DIR / path

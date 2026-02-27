@@ -5,8 +5,7 @@ __pycache__/
 venv/
 .venv/
 
-# Data (large index files and uploads)
-data/index/
+# Uploads (temporary)
 data/uploads/
 
 # IDE

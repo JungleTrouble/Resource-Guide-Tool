@@ -1,14 +1,24 @@
+import os
 from pathlib import Path
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent.parent
-RESOURCES_DIR = Path(r"C:\Users\micha\OneDrive\MedSchoolPlug")
 UPLOAD_DIR = BASE_DIR / "data" / "uploads"
-CHROMA_DIR = BASE_DIR / "data" / "index"
+INDEX_DIR = BASE_DIR / "data" / "index"
+
+# Resource directory — set via env var or fall back to local Windows path
+_resources_env = os.environ.get("RESOURCES_DIR")
+if _resources_env:
+    RESOURCES_DIR = Path(_resources_env)
+else:
+    RESOURCES_DIR = Path(r"C:\Users\micha\OneDrive\MedSchoolPlug")
+
+# Detect if running on Replit (no local resource files available)
+IS_CLOUD = os.environ.get("REPL_ID") is not None
 
 # Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+INDEX_DIR.mkdir(parents=True, exist_ok=True)
 
 # Embedding model (runs locally, free)
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"

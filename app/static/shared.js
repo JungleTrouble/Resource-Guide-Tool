@@ -20,7 +20,16 @@ function openResource(path) {
     fetch('/open?path=' + encodeURIComponent(path))
         .then(r => r.json())
         .then(data => {
-            if (data.error) {
+            if (data.status === 'cloud') {
+                navigator.clipboard.writeText(path).then(() => {
+                    const toast = document.getElementById('copyToast');
+                    if (toast) {
+                        toast.textContent = 'Path copied! Find this file in your OneDrive.';
+                        toast.classList.add('show');
+                        setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 3000);
+                    }
+                });
+            } else if (data.error) {
                 alert('Could not open file: ' + data.error);
             }
         })
