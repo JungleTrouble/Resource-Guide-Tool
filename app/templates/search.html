@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Guide Search</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">&#9790;</button>
+
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">&larr; Back to Upload</a>
+            <h1>Resource Guide Search</h1>
+            <p class="subtitle">Search for topics, resources, or keywords</p>
+        </header>
+
+        <div class="search-card card">
+            <form action="/search" method="get" class="search-form" id="searchForm">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">&#128269;</span>
+                    <input
+                        type="text"
+                        name="q"
+                        class="search-input"
+                        id="searchInput"
+                        placeholder="e.g. cardiac anatomy, diabetes, pneumonia..."
+                        value="{{ query }}"
+                        autofocus
+                        autocomplete="off"
+                    >
+                    <button type="submit" class="btn btn-primary search-btn">Search</button>
+                </div>
+            </form>
+            <p class="kbd-hint">Press <kbd>/</kbd> to focus search</p>
+            <div class="recent-searches" id="recentSearches"></div>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        {% if results %}
+            {% if results.total == 0 %}
+            <div class="search-empty">
+                <p>No matching resources found for "<strong>{{ query }}</strong>".</p>
+                <p class="search-empty-hint">Try a broader term or different keywords.</p>
+            </div>
+            {% else %}
+            <div class="results-summary">
+                Found <strong>{{ results.total }}</strong> resource{{ "s" if results.total != 1 else "" }}
+                across <strong>{{ results.source_groups | length }}</strong> source{{ "s" if results.source_groups | length != 1 else "" }}
+                for "<strong>{{ query }}</strong>"
+            </div>
+
+            <div class="action-bar">
+                <div class="action-bar-left">
+                    <div class="source-filters" id="sourceFilters">
+                        {% for group in results.source_groups %}
+                        <label class="source-filter-label active" data-source="{{ group.source }}">
+                            <input type="checkbox" checked onchange="filterSources()">
+                            {{ group.source }} ({{ group.resources | length }})
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="action-bar-right">
+                    <button class="btn btn-secondary btn-sm" onclick="exportChecklist()">Export Checklist</button>
+                </div>
+            </div>
+
+            <div class="source-groups" id="searchResults">
+                {% for group in results.source_groups %}
+                <div class="source-group" data-source="{{ group.source }}">
+                    <div class="source-group-header">
+                        <span class="source-group-name">{{ group.source }}</span>
+                        <span class="source-group-count">{{ group.resources | length }} resource{{ "s" if group.resources | length != 1 else "" }}</span>
+                    </div>
+                    <div class="resources-list">
+                        {% for resource in group.resources %}
+                        <div class="resource-item" onclick="openResource('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
+                            <div class="resource-icon">
+                                {% if resource.file_type == "video" %}
+                                &#127909;
+                                {% elif resource.file_type == "pdf" %}
+                                &#128196;
+                                {% elif resource.file_type == "anki" %}
+                                &#127183;
+                                {% else %}
+                                &#128193;
+                                {% endif %}
+                            </div>
+                            <div class="resource-info">
+                                <div class="resource-name resource-link">{{ resource.filename }}</div>
+                                <div class="resource-meta">
+                                    {% if resource.subject %}
+                                    <span class="subject-tag">{{ resource.subject }}</span>
+                                    {% endif %}
+                                    <span class="relevance-tag" title="Relevance score">
+                                        {{ (resource.relevance * 100) | round(0) | int }}% match
+                                    </span>
+                                </div>
+                                <div class="resource-path">{{ resource.relative_path }}</div>
+                            </div>
+                            <div class="resource-actions" onclick="event.stopPropagation()">
+                                <button class="action-icon" onclick="toggleBookmark('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Bookmark">&#9734;</button>
+                                <button class="action-icon" onclick="copyPath('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% elif not error and query == "" %}
+        <div class="search-empty">
+            <p class="search-empty-hint">Enter a topic or keyword above to search {{ index_count }} indexed resources.</p>
+        </div>
+        {% endif %}
+
+        <footer>
+            <a href="/" class="btn btn-secondary">Upload a PDF Instead</a>
+        </footer>
+    </div>
+
+    <div class="copy-toast" id="copyToast">Path copied to clipboard</div>
+
+    <script src="/static/shared.js"></script>
+    <script>
+    // Save search to recent
+    (function() {
+        const query = '{{ query | replace("'", "\\'") }}';
+        if (query) {
+            saveRecentSearch(query);
+        }
+        renderRecentSearches();
+    })();
+    </script>
+</body>
+</html>

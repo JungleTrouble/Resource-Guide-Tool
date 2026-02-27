@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recommendations - Resource Guide AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">&#9790;</button>
+
+    {% if results.topics | length > 0 and not results.error %}
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="back-link">&larr; Back</a>
+            <div class="sidebar-title">Topics</div>
+        </div>
+        <ul class="sidebar-nav">
+            {% for topic in results.topics %}
+            <li>
+                <a href="#topic-{{ loop.index }}" class="sidebar-link" data-topic="{{ loop.index }}">
+                    <span class="sidebar-num">{{ loop.index }}</span>
+                    <span class="sidebar-text">{{ topic.name }}</span>
+                    <span class="sidebar-count">{{ topic.source_groups | length }} sources</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    <div class="{% if results.topics | length > 0 and not results.error %}content-with-sidebar{% else %}container{% endif %}">
+        <header>
+            {% if results.error or results.topics | length == 0 %}
+            <a href="/" class="back-link">&larr; Upload another PDF</a>
+            {% endif %}
+            <h1>Resource Guide AI</h1>
+            <p class="subtitle">Recommendations for: <strong>{{ filename }}</strong></p>
+        </header>
+
+        <!-- Search bar on results page -->
+        <div class="search-card card">
+            <form action="/search" method="get" class="search-form">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">&#128269;</span>
+                    <input
+                        type="text"
+                        name="q"
+                        class="search-input"
+                        placeholder="Search for more resources..."
+                        autocomplete="off"
+                    >
+                    <button type="submit" class="btn btn-primary search-btn">Search</button>
+                </div>
+            </form>
+        </div>
+
+        {% if results.error %}
+        <div class="alert alert-error">{{ results.error }}</div>
+        {% elif results.topics | length == 0 %}
+        <div class="alert alert-error">No topics could be extracted from this PDF.</div>
+        {% else %}
+
+        <div class="results-summary">
+            Found <strong>{{ results.topics | length }}</strong> topic{{ "s" if results.topics | length != 1 else "" }}
+            with matching resources from your drive.
+        </div>
+
+        <div class="action-bar">
+            <div class="action-bar-left">
+                <div class="source-filters" id="sourceFilters">
+                </div>
+            </div>
+            <div class="action-bar-right">
+                <button class="btn btn-secondary btn-sm" onclick="exportChecklist()">Export Checklist</button>
+            </div>
+        </div>
+
+        {% for topic in results.topics %}
+        <div class="topic-card" id="topic-{{ loop.index }}">
+            <div class="topic-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <div class="topic-title">
+                    <span class="topic-number">{{ loop.index }}</span>
+                    <h2>{{ topic.name }}</h2>
+                </div>
+                <span class="toggle-icon">&#9660;</span>
+            </div>
+
+            <div class="topic-body">
+                {% if topic.text_snippet %}
+                <div class="topic-snippet">{{ topic.text_snippet }}</div>
+                {% endif %}
+
+                {% if topic.source_groups | length > 0 %}
+                <div class="source-groups">
+                    {% for group in topic.source_groups %}
+                    <div class="source-group" data-source="{{ group.source }}">
+                        <div class="source-group-header">
+                            <span class="source-group-name">{{ group.source }}</span>
+                            <span class="source-group-count">{{ group.resources | length }} resource{{ "s" if group.resources | length != 1 else "" }}</span>
+                        </div>
+                        <div class="resources-list">
+                            {% for resource in group.resources %}
+                            <div class="resource-item" onclick="openResource('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
+                                <div class="resource-icon">
+                                    {% if resource.file_type == "video" %}
+                                    &#127909;
+                                    {% elif resource.file_type == "pdf" %}
+                                    &#128196;
+                                    {% elif resource.file_type == "anki" %}
+                                    &#127183;
+                                    {% else %}
+                                    &#128193;
+                                    {% endif %}
+                                </div>
+                                <div class="resource-info">
+                                    <div class="resource-name resource-link">{{ resource.filename }}</div>
+                                    <div class="resource-meta">
+                                        {% if resource.subject %}
+                                        <span class="subject-tag">{{ resource.subject }}</span>
+                                        {% endif %}
+                                        <span class="relevance-tag" title="Relevance score">
+                                            {{ (resource.relevance * 100) | round(0) | int }}% match
+                                        </span>
+                                    </div>
+                                    <div class="resource-path">{{ resource.relative_path }}</div>
+                                </div>
+                                <div class="resource-actions" onclick="event.stopPropagation()">
+                                    <button class="action-icon" onclick="toggleBookmark('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Bookmark">&#9734;</button>
+                                    <button class="action-icon" onclick="copyPath('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="no-results">No closely matching resources found for this topic.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% endif %}
+
+        <footer>
+            <a href="/" class="btn btn-primary">Upload Another PDF</a>
+        </footer>
+    </div>
+
+    <div class="copy-toast" id="copyToast">Path copied to clipboard</div>
+
+    <script src="/static/shared.js"></script>
+    <script>
+    // Build source filter checkboxes from all source groups on the page
+    (function() {
+        const sources = new Set();
+        document.querySelectorAll('.source-group[data-source]').forEach(g => {
+            sources.add(g.dataset.source);
+        });
+        const container = document.getElementById('sourceFilters');
+        if (container && sources.size > 1) {
+            sources.forEach(src => {
+                const label = document.createElement('label');
+                label.className = 'source-filter-label active';
+                label.dataset.source = src;
+                label.innerHTML = '<input type="checkbox" checked onchange="filterSources()">' + src;
+                container.appendChild(label);
+            });
+        }
+    })();
+
+    // Highlight active sidebar link on scroll
+    (function() {
+        const links = document.querySelectorAll('.sidebar-link');
+        const topics = document.querySelectorAll('.topic-card');
+        if (!links.length) return;
+
+        // Smooth scroll on click
+        links.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const id = link.getAttribute('href').slice(1);
+                const el = document.getElementById(id);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Expand if collapsed
+                    el.classList.remove('collapsed');
+                }
+            });
+        });
+
+        // Track scroll position to highlight active topic
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    links.forEach(l => l.classList.remove('active'));
+                    const active = document.querySelector('.sidebar-link[href="#' + id + '"]');
+                    if (active) active.classList.add('active');
+                }
+            });
+        }, { rootMargin: '-20% 0px -60% 0px' });
+
+        topics.forEach(t => observer.observe(t));
+
+        // Set first as active initially
+        if (links[0]) links[0].classList.add('active');
+    })();
+    </script>
+</body>
+</html>

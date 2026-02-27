@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Guide AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">&#9790;</button>
+
+    <div class="container">
+        <header>
+            <h1>Resource Guide AI</h1>
+            <p class="subtitle">Upload a lecture PDF and get personalized study resource recommendations</p>
+        </header>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <div id="indexAlert" class="alert alert-success" style="display:none;"></div>
+
+        <div class="card">
+            <div class="index-status">
+                <span class="status-badge" id="statusBadge">
+                    {% if index_count > 0 %}
+                    <span class="status-ready">{{ index_count }} resources indexed</span>
+                    {% else %}
+                    <span class="status-empty">No resources indexed</span>
+                    {% endif %}
+                </span>
+
+                <button type="button" class="btn btn-secondary" id="indexBtn" onclick="startIndexing()">
+                    {% if index_count > 0 %}Re-index Resources{% else %}Index Resources{% endif %}
+                </button>
+            </div>
+            <div id="indexProgress" style="display:none; margin-top:0.75rem; font-size:0.9rem; color:var(--text-muted);">
+                <div class="spinner-small"></div>
+                <span id="indexProgressText">Starting...</span>
+            </div>
+
+            {% if source_counts %}
+            <div class="source-breakdown">
+                {% for source, count in source_counts.items() | sort(attribute='1', reverse=true) %}
+                <span class="source-chip">{{ source }} ({{ count }})</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card search-card">
+            <h2>Search Resources</h2>
+            <form action="/search" method="get" class="search-form">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">&#128269;</span>
+                    <input
+                        type="text"
+                        name="q"
+                        class="search-input"
+                        placeholder="Search by topic, e.g. cardiac anatomy, diabetes..."
+                        autocomplete="off"
+                    >
+                    <button type="submit" class="btn btn-primary search-btn">Search</button>
+                </div>
+            </form>
+            <p class="kbd-hint">Press <kbd>/</kbd> to focus search</p>
+        </div>
+
+        <div class="card upload-card">
+            <h2>Upload Lecture PDFs</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="drop-zone" id="dropZone">
+                    <div class="drop-zone-content">
+                        <div class="drop-icon">&#128196;</div>
+                        <p>Drag & drop your PDFs here</p>
+                        <p class="drop-hint">or click to browse (supports multiple files)</p>
+                    </div>
+                    <input type="file" name="pdf" accept=".pdf" id="fileInput" multiple required>
+                </div>
+                <div class="file-name" id="fileName"></div>
+                <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                    Get Recommendations
+                </button>
+            </form>
+        </div>
+
+        <footer>
+            <p>Powered by sentence-transformers</p>
+        </footer>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p>Analyzing your PDFs and finding matching resources...</p>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
