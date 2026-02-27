@@ -1,9 +1,8 @@
 import json
-import pickle
 from pathlib import Path
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
 from app.config import INDEX_DIR, EMBEDDING_MODEL, RESULTS_PER_TOPIC
 EMBEDDINGS_FILE = INDEX_DIR / "embeddings.npy"
@@ -15,12 +14,12 @@ _embeddings = None
 _metadata = None
 
 
-def _get_model() -> SentenceTransformer:
-    """Load the sentence-transformer model (cached)."""
+def _get_model() -> TextEmbedding:
+    """Load the fastembed model (cached)."""
     global _model
     if _model is None:
         print(f"Loading embedding model: {EMBEDDING_MODEL}...")
-        _model = SentenceTransformer(EMBEDDING_MODEL)
+        _model = TextEmbedding(EMBEDDING_MODEL)
         print("Model loaded.")
     return _model
 
@@ -59,14 +58,15 @@ def index_resources(resources: list[dict]) -> int:
     # Extract documents for embedding
     documents = [r["document"] for r in resources]
 
-    # Generate embeddings in batches
+    # Generate embeddings using fastembed
     print(f"Generating embeddings for {len(documents)} resources...")
-    embeddings = model.encode(
-        documents,
-        show_progress_bar=True,
-        batch_size=128,
-        normalize_embeddings=True,
-    )
+    embeddings_list = list(model.embed(documents, batch_size=128))
+    embeddings = np.array(embeddings_list)
+
+    # Normalize embeddings for cosine similarity via dot product
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    norms[norms == 0] = 1  # avoid division by zero
+    embeddings = embeddings / norms
 
     # Save embeddings as numpy array
     INDEX_DIR.mkdir(parents=True, exist_ok=True)
@@ -109,11 +109,13 @@ def query_similar(query_text: str, n_results: int = RESULTS_PER_TOPIC) -> list[d
 
     model = _get_model()
 
-    # Encode query
-    query_embedding = model.encode(
-        [query_text],
-        normalize_embeddings=True,
-    )[0]
+    # Encode query using fastembed
+    query_embedding = list(model.embed([query_text]))[0]
+
+    # Normalize
+    norm = np.linalg.norm(query_embedding)
+    if norm > 0:
+        query_embedding = query_embedding / norm
 
     # Cosine similarity (since embeddings are normalized, dot product = cosine sim)
     similarities = np.dot(_embeddings, query_embedding)
