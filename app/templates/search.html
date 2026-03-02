@@ -12,6 +12,7 @@
     <div class="container">
         <header>
             <a href="/" class="back-link">&larr; Back to Upload</a>
+            <a href="/playlist" class="playlist-link" style="float:right;">&#9835; My Playlist <span class="playlist-badge" id="playlistBadge" style="display:none;">0</span></a>
             <h1>Resource Guide Search</h1>
             <p class="subtitle">Search for topics, resources, or keywords</p>
         </header>
@@ -106,6 +107,7 @@
                             <div class="resource-actions" onclick="event.stopPropagation()">
                                 <button class="action-icon" onclick="toggleBookmark('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Bookmark">&#9734;</button>
                                 <button class="action-icon" onclick="copyPath('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
+                                <button class="action-icon" onclick="addToPlaylist('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Add to playlist">&#43;</button>
                             </div>
                         </div>
                         {% endfor %}

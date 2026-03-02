@@ -67,6 +67,23 @@
             <p class="kbd-hint">Press <kbd>/</kbd> to focus search</p>
         </div>
 
+        <div class="card">
+            <div class="playlist-header-row">
+                <h2 style="margin:0;">Playlists</h2>
+                <a href="/playlist" class="playlist-link">
+                    My Playlist <span class="playlist-badge" id="playlistBadge" style="display:none;">0</span>
+                </a>
+            </div>
+            <div style="margin-top:0.75rem;">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">&#128279;</span>
+                    <input type="text" id="playlistCodeInput" class="search-input"
+                           placeholder="Paste a playlist code to load..." maxlength="8">
+                    <button class="btn btn-primary search-btn" onclick="loadPlaylistByCode()">Load</button>
+                </div>
+            </div>
+        </div>
+
         <div class="card upload-card">
             <h2>Upload Lecture PDFs</h2>
             <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
@@ -95,6 +112,7 @@
         <p>Analyzing your PDFs and finding matching resources...</p>
     </div>
 
+    <script src="/static/shared.js"></script>
     <script src="/static/script.js"></script>
 </body>
 </html>

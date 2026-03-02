@@ -1,0 +1,26 @@
+{
+  "8gaJOf": {
+    "name": "Cardio Study Set",
+    "resources": [
+      {
+        "path": "Boards&Beyond\\Cardiology\\01. Introduction to Cardiac Medicine\\01 Cardiac Anatomy.mp4",
+        "filename": "01 Cardiac Anatomy.mp4",
+        "source": "Boards and Beyond",
+        "fileType": "video"
+      },
+      {
+        "path": "Boards&Beyond\\Cardiology\\01. Introduction to Cardiac Medicine\\02 Cardiac Physiology.mp4",
+        "filename": "02 Cardiac Physiology.mp4",
+        "source": "Boards and Beyond",
+        "fileType": "video"
+      },
+      {
+        "path": "Boards&Beyond\\Cardiology\\01. Introduction to Cardiac Medicine\\06 Wiggers' Diagram.mp4",
+        "filename": "06 Wiggers' Diagram.mp4",
+        "source": "Boards and Beyond",
+        "fileType": "video"
+      }
+    ],
+    "created_at": "2026-02-27T22:18:48.726563+00:00"
+  }
+}

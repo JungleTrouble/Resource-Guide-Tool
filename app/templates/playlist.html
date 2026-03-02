@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if playlist %}{{ playlist.name }}{% else %}My Playlist{% endif %} - Resource Guide AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">&#9790;</button>
+
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">&larr; Back to Home</a>
+            <h1>{% if playlist %}{{ playlist.name }}{% else %}My Playlist{% endif %}</h1>
+            <p class="subtitle">
+                {% if code and playlist %}
+                Shared playlist &middot; Code: <strong>{{ code }}</strong>
+                {% else %}
+                Build a playlist of resources to study together
+                {% endif %}
+            </p>
+        </header>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <!-- Load Playlist Section -->
+        <div class="card">
+            <h2>Load a Shared Playlist</h2>
+            <div class="search-input-wrapper">
+                <span class="search-icon">&#128279;</span>
+                <input type="text" id="playlistCodeInput" class="search-input"
+                       placeholder="Paste a playlist code, e.g. abc123" maxlength="8">
+                <button class="btn btn-primary search-btn" onclick="loadPlaylistByCode()">Load</button>
+            </div>
+        </div>
+
+        <!-- Playlist Contents -->
+        <div class="card">
+            <div class="playlist-header-row">
+                <h2 id="playlistTitle">
+                    {% if playlist %}
+                    {{ playlist.resources | length }} resource{{ "s" if playlist.resources | length != 1 }}
+                    {% else %}
+                    0 resources
+                    {% endif %}
+                </h2>
+                <div class="playlist-actions">
+                    <button class="btn btn-primary btn-sm" id="shareBtn" onclick="sharePlaylist()"
+                        {% if not playlist %}style="display:none;"{% endif %}>
+                        Share Playlist
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="clearBtn" onclick="clearPlaylist()"
+                        {% if not playlist %}style="display:none;"{% endif %}>
+                        Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Share result banner -->
+            <div id="shareResult" style="display:none;">
+                <span id="shareResultText"></span>
+                <button class="action-icon" onclick="copyShareCode()" title="Copy code">&#128203;</button>
+            </div>
+
+            <!-- Resource list -->
+            <div class="resources-list" id="playlistResources">
+                {% if playlist %}
+                    {% for resource in playlist.resources %}
+                    <div class="resource-item" onclick="openResource('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
+                        <div class="resource-icon">
+                            {% if resource.fileType == "video" %}&#127909;
+                            {% elif resource.fileType == "pdf" %}&#128196;
+                            {% elif resource.fileType == "anki" %}&#127183;
+                            {% else %}&#128193;{% endif %}
+                        </div>
+                        <div class="resource-info">
+                            <div class="resource-name resource-link">{{ resource.filename }}</div>
+                            <div class="resource-meta">
+                                <span class="source-badge">{{ resource.source }}</span>
+                            </div>
+                            <div class="resource-path">{{ resource.path }}</div>
+                        </div>
+                        <div class="resource-actions" onclick="event.stopPropagation()">
+                            <button class="action-icon" onclick="toggleBookmark('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.fileType }}', this)" title="Bookmark">&#9734;</button>
+                            <button class="action-icon" onclick="copyPath('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
+                            <button class="action-icon playlist-remove" onclick="removeFromPlaylist('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Remove">&#10006;</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <div class="search-empty" id="playlistEmpty"
+                {% if playlist and playlist.resources %}style="display:none;"{% endif %}>
+                <p>Your playlist is empty.</p>
+                <p class="search-empty-hint">Add resources from search results or recommendations using the + button, or load a shared playlist code above.</p>
+            </div>
+        </div>
+
+        <footer>
+            <a href="/search" class="btn btn-secondary">Search Resources</a>
+            <a href="/" class="btn btn-primary" style="margin-left:0.5rem;">Upload a PDF</a>
+        </footer>
+    </div>
+
+    <div class="copy-toast" id="copyToast">Path copied to clipboard</div>
+
+    <script src="/static/shared.js"></script>
+    <script>
+    (function() {
+        const serverPlaylist = {{ playlist | tojson if playlist else 'null' }};
+        const serverCode = {{ code | tojson if code else 'null' }};
+
+        if (serverPlaylist && serverCode) {
+            // Viewing a shared playlist — save it locally
+            savePlaylistToLocal(serverCode, serverPlaylist.name, serverPlaylist.resources);
+        } else if (!serverPlaylist) {
+            // No server data — render from localStorage
+            renderLocalPlaylist();
+        }
+    })();
+    </script>
+</body>
+</html>

@@ -21,19 +21,16 @@ function openResource(path) {
         .then(r => r.json())
         .then(data => {
             if (data.status === 'cloud') {
-                if (data.onedrive_url) {
-                    // Open OneDrive link in a new tab
-                    window.open(data.onedrive_url, '_blank');
+                navigator.clipboard.writeText(path);
+                if (data.driveUrl) {
+                    window.open(data.driveUrl, '_blank');
                 }
-                // Also copy path as fallback
-                navigator.clipboard.writeText(path).then(() => {
-                    const toast = document.getElementById('copyToast');
-                    if (toast) {
-                        toast.textContent = 'Opening in OneDrive... Path also copied!';
-                        toast.classList.add('show');
-                        setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 3000);
-                    }
-                });
+                const toast = document.getElementById('copyToast');
+                if (toast) {
+                    toast.textContent = 'Path copied — find this file in the Google Drive folder';
+                    toast.classList.add('show');
+                    setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 3000);
+                }
             } else if (data.error) {
                 alert('Could not open file: ' + data.error);
             }
@@ -202,6 +199,202 @@ function renderRecentSearches() {
     container.innerHTML = '<span class="recent-label">Recent:</span>' +
         recent.map(q => '<a href="/search?q=' + encodeURIComponent(q) + '" class="recent-chip">' + q + '</a>').join('');
 }
+
+// === Playlist ===
+function getPlaylist() {
+    try {
+        return JSON.parse(localStorage.getItem('currentPlaylist') || 'null');
+    } catch { return null; }
+}
+
+function savePlaylistRaw(playlist) {
+    localStorage.setItem('currentPlaylist', JSON.stringify(playlist));
+}
+
+function savePlaylistToLocal(code, name, resources) {
+    savePlaylistRaw({ code: code, name: name, resources: resources });
+}
+
+function getPlaylistResources() {
+    const pl = getPlaylist();
+    return pl ? pl.resources || [] : [];
+}
+
+function isInPlaylist(path) {
+    return getPlaylistResources().some(r => r.path === path);
+}
+
+function addToPlaylist(path, filename, source, fileType, btn) {
+    let pl = getPlaylist() || { code: null, name: 'My Playlist', resources: [] };
+    if (pl.resources.some(r => r.path === path)) {
+        // Remove (toggle off)
+        pl.resources = pl.resources.filter(r => r.path !== path);
+        if (btn) {
+            btn.classList.remove('in-playlist');
+            btn.innerHTML = '&#43;';
+        }
+    } else {
+        // Add
+        pl.resources.push({ path, filename, source, fileType });
+        if (btn) {
+            btn.classList.add('in-playlist');
+            btn.innerHTML = '&#10003;';
+        }
+    }
+    pl.code = null;
+    savePlaylistRaw(pl);
+    updatePlaylistCount();
+}
+
+function removeFromPlaylist(path) {
+    let pl = getPlaylist();
+    if (!pl) return;
+    pl.resources = pl.resources.filter(r => r.path !== path);
+    pl.code = null;
+    savePlaylistRaw(pl);
+    if (typeof renderLocalPlaylist === 'function') {
+        renderLocalPlaylist();
+    }
+    updatePlaylistCount();
+}
+
+function clearPlaylist() {
+    if (!confirm('Clear your entire playlist?')) return;
+    localStorage.removeItem('currentPlaylist');
+    if (typeof renderLocalPlaylist === 'function') {
+        renderLocalPlaylist();
+    }
+    updatePlaylistCount();
+}
+
+function updatePlaylistCount() {
+    const badge = document.getElementById('playlistBadge');
+    if (!badge) return;
+    const count = getPlaylistResources().length;
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+}
+
+function sharePlaylist() {
+    const pl = getPlaylist();
+    if (!pl || pl.resources.length === 0) {
+        alert('Add resources to your playlist first.');
+        return;
+    }
+
+    const name = prompt('Name your playlist:', pl.name || 'My Playlist');
+    if (!name) return;
+
+    fetch('/api/playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, resources: pl.resources }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+            return;
+        }
+        pl.code = data.code;
+        pl.name = name;
+        savePlaylistRaw(pl);
+
+        const resultEl = document.getElementById('shareResult');
+        const resultText = document.getElementById('shareResultText');
+        if (resultEl && resultText) {
+            resultText.textContent = 'Share code: ' + data.code + '  \u2022  Link: ' + window.location.origin + data.url;
+            resultEl.style.display = 'flex';
+        }
+    })
+    .catch(() => alert('Could not save playlist. Try again.'));
+}
+
+function copyShareCode() {
+    const pl = getPlaylist();
+    if (!pl || !pl.code) return;
+    navigator.clipboard.writeText(pl.code).then(() => {
+        const toast = document.getElementById('copyToast');
+        if (toast) {
+            toast.textContent = 'Playlist code copied!';
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 2000);
+        }
+    });
+}
+
+function loadPlaylistByCode() {
+    const input = document.getElementById('playlistCodeInput');
+    if (!input) return;
+    const code = input.value.trim();
+    if (!code) return;
+    window.location.href = '/playlist/' + encodeURIComponent(code);
+}
+
+function renderLocalPlaylist() {
+    const pl = getPlaylist();
+    const container = document.getElementById('playlistResources');
+    const emptyMsg = document.getElementById('playlistEmpty');
+    const titleEl = document.getElementById('playlistTitle');
+    const shareBtn = document.getElementById('shareBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    if (!container) return;
+
+    const resources = pl ? pl.resources || [] : [];
+
+    if (resources.length === 0) {
+        container.innerHTML = '';
+        if (emptyMsg) emptyMsg.style.display = '';
+        if (titleEl) titleEl.textContent = '0 resources';
+        if (shareBtn) shareBtn.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        return;
+    }
+
+    if (emptyMsg) emptyMsg.style.display = 'none';
+    if (titleEl) titleEl.textContent = resources.length + ' resource' + (resources.length !== 1 ? 's' : '');
+    if (shareBtn) shareBtn.style.display = '';
+    if (clearBtn) clearBtn.style.display = '';
+
+    container.innerHTML = resources.map(r => {
+        const escapedPath = r.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedFilename = r.filename.replace(/'/g, "\\'");
+        const escapedSource = (r.source || '').replace(/'/g, "\\'");
+        const icon = r.fileType === 'video' ? '&#127909;' :
+                     r.fileType === 'pdf' ? '&#128196;' :
+                     r.fileType === 'anki' ? '&#127183;' : '&#128193;';
+        return '<div class="resource-item" onclick="openResource(\'' + escapedPath + '\')">' +
+            '<div class="resource-icon">' + icon + '</div>' +
+            '<div class="resource-info">' +
+                '<div class="resource-name resource-link">' + r.filename + '</div>' +
+                '<div class="resource-meta"><span class="source-badge">' + (r.source || '') + '</span></div>' +
+                '<div class="resource-path">' + r.path + '</div>' +
+            '</div>' +
+            '<div class="resource-actions" onclick="event.stopPropagation()">' +
+                '<button class="action-icon" onclick="toggleBookmark(\'' + escapedPath + '\', \'' + escapedFilename + '\', \'' + escapedSource + '\', \'' + (r.fileType || '') + '\', this)" title="Bookmark">&#9734;</button>' +
+                '<button class="action-icon" onclick="copyPath(\'' + escapedPath + '\')" title="Copy path">&#128203;</button>' +
+                '<button class="action-icon playlist-remove" onclick="removeFromPlaylist(\'' + escapedPath + '\')" title="Remove">&#10006;</button>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+// Restore playlist button states on page load
+(function() {
+    document.querySelectorAll('.action-icon[title="Add to playlist"]').forEach(btn => {
+        const item = btn.closest('.resource-item');
+        if (!item) return;
+        const onclick = item.getAttribute('onclick');
+        if (!onclick) return;
+        const match = onclick.match(/openResource\('(.+?)'\)/);
+        if (match && isInPlaylist(match[1])) {
+            btn.classList.add('in-playlist');
+            btn.innerHTML = '&#10003;';
+        }
+    });
+    updatePlaylistCount();
+})();
 
 // === Keyboard Shortcuts ===
 document.addEventListener('keydown', function (e) {

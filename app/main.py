@@ -1,14 +1,20 @@
+import json
 import os
+import random
+import string
 import threading
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
-from app.config import IS_CLOUD, ONEDRIVE_CID, RESOURCES_DIR, UPLOAD_DIR
+from app.config import DRIVE_URL, IS_CLOUD, RESOURCES_DIR, UPLOAD_DIR
 from app.embeddings import clear_index, get_index_count, get_source_counts, index_resources
 from app.indexer import scan_resources
 from app.recommender import recommend, recommend_multi, search_resources
@@ -190,24 +196,8 @@ async def open_file(path: str = ""):
         return JSONResponse({"error": "No path provided"}, status_code=400)
 
     if IS_CLOUD:
-        # Build a OneDrive link from the relative path
-        # The path is relative to RESOURCES_DIR (e.g., "Sketchy/Pharmacology/video.mp4")
-        # Convert backslashes to forward slashes for URL
-        clean_path = path.replace("\\", "/")
-        # URL-encode the path for OneDrive
-        from urllib.parse import quote
-        onedrive_folder = "/".join(clean_path.split("/")[:-1])  # parent folder
-        if ONEDRIVE_CID:
-            onedrive_url = f"https://onedrive.live.com/?cid={ONEDRIVE_CID}&id=root&path=/{quote(clean_path)}"
-        else:
-            # Fallback: open OneDrive root — user can navigate from there
-            onedrive_url = f"https://onedrive.live.com/"
-        return JSONResponse({
-            "status": "cloud",
-            "path": path,
-            "onedrive_url": onedrive_url,
-            "message": "Opening in OneDrive...",
-        })
+        # On cloud, we can't open local files — direct to Google Drive
+        return JSONResponse({"status": "cloud", "path": path, "driveUrl": DRIVE_URL})
 
     # Resolve the full path within the resources directory
     full_path = RESOURCES_DIR / path
@@ -232,3 +222,110 @@ async def open_file(path: str = ""):
 async def status():
     """Return current index status."""
     return {"indexed_resources": get_index_count()}
+
+
+# === Playlists ===
+
+PLAYLISTS_FILE = Path("data/playlists.json")
+_playlist_lock = threading.Lock()
+
+
+def _load_playlists() -> dict:
+    """Load playlists from disk."""
+    if PLAYLISTS_FILE.exists():
+        with open(PLAYLISTS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_playlists(playlists: dict):
+    """Save playlists to disk."""
+    PLAYLISTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(PLAYLISTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(playlists, f, indent=2)
+
+
+def _generate_code(existing_codes: set, length: int = 6) -> str:
+    """Generate a unique short alphanumeric code."""
+    chars = string.ascii_letters + string.digits
+    for _ in range(100):
+        code = "".join(random.choices(chars, k=length))
+        if code not in existing_codes:
+            return code
+    raise RuntimeError("Could not generate unique code")
+
+
+class PlaylistCreate(BaseModel):
+    name: str
+    resources: list[dict]
+
+
+@app.post("/api/playlist")
+async def create_playlist(data: PlaylistCreate):
+    """Create a shareable playlist and return a short code."""
+    name = data.name.strip()
+    if not name:
+        return JSONResponse({"error": "Playlist name is required"}, status_code=400)
+    if not data.resources:
+        return JSONResponse({"error": "Playlist must have at least one resource"}, status_code=400)
+    if len(data.resources) > 100:
+        return JSONResponse({"error": "Playlist too large (max 100 resources)"}, status_code=400)
+
+    for r in data.resources:
+        if "path" not in r or "filename" not in r:
+            return JSONResponse({"error": "Each resource must have 'path' and 'filename'"}, status_code=400)
+
+    with _playlist_lock:
+        playlists = _load_playlists()
+        code = _generate_code(set(playlists.keys()))
+        playlists[code] = {
+            "name": name,
+            "resources": [
+                {
+                    "path": r.get("path", ""),
+                    "filename": r.get("filename", ""),
+                    "source": r.get("source", ""),
+                    "fileType": r.get("fileType", ""),
+                }
+                for r in data.resources
+            ],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _save_playlists(playlists)
+
+    return JSONResponse({"code": code, "url": f"/playlist/{code}"})
+
+
+@app.get("/api/playlist/{code}")
+async def get_playlist_api(code: str):
+    """Return playlist data as JSON."""
+    playlists = _load_playlists()
+    playlist = playlists.get(code)
+    if not playlist:
+        return JSONResponse({"error": "Playlist not found"}, status_code=404)
+    return JSONResponse({"code": code, "name": playlist["name"], "resources": playlist["resources"]})
+
+
+@app.get("/playlist", response_class=HTMLResponse)
+async def playlist_page(request: Request):
+    """Render the playlist management page."""
+    return templates.TemplateResponse(
+        "playlist.html",
+        {"request": request, "playlist": None, "code": None, "error": None},
+    )
+
+
+@app.get("/playlist/{code}", response_class=HTMLResponse)
+async def view_playlist(request: Request, code: str):
+    """Render a shared playlist page."""
+    playlists = _load_playlists()
+    playlist = playlists.get(code)
+    return templates.TemplateResponse(
+        "playlist.html",
+        {
+            "request": request,
+            "playlist": playlist,
+            "code": code,
+            "error": "Playlist not found" if not playlist else None,
+        },
+    )

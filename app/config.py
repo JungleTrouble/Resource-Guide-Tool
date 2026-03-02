@@ -13,12 +13,14 @@ if _resources_env:
 else:
     RESOURCES_DIR = Path(r"C:\Users\micha\OneDrive\MedSchoolPlug")
 
-# Detect if running on Replit (no local resource files available)
-IS_CLOUD = os.environ.get("REPL_ID") is not None or os.environ.get("RENDER") is not None
+# Detect if running in the cloud (no local resource files available)
+IS_CLOUD = os.environ.get("REPL_ID") is not None or os.environ.get("RENDER") is not None or os.environ.get("SPACE_ID") is not None or os.environ.get("IS_CLOUD") == "1"
 
-# OneDrive sharing — set ONEDRIVE_CID env var to your OneDrive account CID
-# to allow direct links to files. Find your CID at https://onedrive.live.com → look at the URL.
-ONEDRIVE_CID = os.environ.get("ONEDRIVE_CID", "")
+# Google Drive shared folder for cloud users to find resources
+DRIVE_URL = os.environ.get(
+    "DRIVE_URL",
+    "https://drive.google.com/drive/folders/1BqUywZPB5tatpV0CKxus5OYquhkj-gXb?usp=sharing",
+)
 
 # Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

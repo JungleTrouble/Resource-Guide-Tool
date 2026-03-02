@@ -56,39 +56,6 @@ function updateFileName(files) {
     uploadBtn.disabled = false;
 }
 
-// === Dark Mode (also in shared.js, but needed on index page) ===
-function toggleDarkMode() {
-    document.body.classList.toggle('dark');
-    const isDark = document.body.classList.contains('dark');
-    localStorage.setItem('darkMode', isDark ? '1' : '0');
-    document.querySelector('.theme-toggle').textContent = isDark ? '\u2600' : '\u263E';
-}
-
-(function() {
-    if (localStorage.getItem('darkMode') === '1') {
-        document.body.classList.add('dark');
-        const btn = document.querySelector('.theme-toggle');
-        if (btn) btn.textContent = '\u2600';
-    }
-})();
-
-// === Keyboard shortcuts for index page ===
-document.addEventListener('keydown', function(e) {
-    if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
-        const input = document.querySelector('.search-input');
-        if (input && document.activeElement !== input) {
-            e.preventDefault();
-            input.focus();
-        }
-    }
-    if (e.key === 'Escape') {
-        const input = document.querySelector('.search-input');
-        if (input && document.activeElement === input) {
-            input.blur();
-        }
-    }
-});
-
 // === Indexing with progress polling ===
 let pollInterval = null;
 
