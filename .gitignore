@@ -19,6 +19,7 @@ Thumbs.db
 # Index data (generated at runtime)
 data/index/onedrive_raw_scan.json
 data/index/onedrive_links.json
+data/index/onedrive_share_progress.json
 
 # Nested repo copy
 Resource-Guide-AI/
