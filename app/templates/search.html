@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resource Guide Search</title>
+    <title>Search - Resource Guide AI</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -11,16 +11,17 @@
 
     <div class="container">
         <header>
-            <a href="/" class="back-link">&larr; Back to Upload</a>
-            <a href="/playlist" class="playlist-link" style="float:right;">&#9835; My Playlist <span class="playlist-badge" id="playlistBadge" style="display:none;">0</span></a>
-            <h1>Resource Guide Search</h1>
-            <p class="subtitle">Search for topics, resources, or keywords</p>
+            <a href="/" class="back-link">&larr; Home</a>
+            <h1>Search</h1>
+            <p class="subtitle">
+                Search for topics, resources, or keywords
+                &middot; <a href="/playlist" class="playlist-link">Playlist <span class="playlist-badge" id="playlistBadge" style="display:none;">0</span></a>
+            </p>
         </header>
 
         <div class="search-card card">
             <form action="/search" method="get" class="search-form" id="searchForm">
                 <div class="search-input-wrapper">
-                    <span class="search-icon">&#128269;</span>
                     <input
                         type="text"
                         name="q"
@@ -82,15 +83,10 @@
                         {% for resource in group.resources %}
                         <div class="resource-item" onclick="openResource('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
                             <div class="resource-icon">
-                                {% if resource.file_type == "video" %}
-                                &#127909;
-                                {% elif resource.file_type == "pdf" %}
-                                &#128196;
-                                {% elif resource.file_type == "anki" %}
-                                &#127183;
-                                {% else %}
-                                &#128193;
-                                {% endif %}
+                                {% if resource.file_type == "video" %}VID
+                                {% elif resource.file_type == "pdf" %}PDF
+                                {% elif resource.file_type == "anki" %}ANK
+                                {% else %}DIR{% endif %}
                             </div>
                             <div class="resource-info">
                                 <div class="resource-name resource-link">{{ resource.filename }}</div>
@@ -99,7 +95,7 @@
                                     <span class="subject-tag">{{ resource.subject }}</span>
                                     {% endif %}
                                     <span class="relevance-tag" title="Relevance score">
-                                        {{ (resource.relevance * 100) | round(0) | int }}% match
+                                        {{ (resource.relevance * 100) | round(0) | int }}%
                                     </span>
                                 </div>
                                 <div class="resource-path">{{ resource.relative_path }}</div>
@@ -123,7 +119,7 @@
         {% endif %}
 
         <footer>
-            <a href="/" class="btn btn-secondary">Upload a PDF Instead</a>
+            <a href="/">Upload a PDF</a>
         </footer>
     </div>
 

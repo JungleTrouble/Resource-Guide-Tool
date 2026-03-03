@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-from fastembed import TextEmbedding
+from sentence_transformers import SentenceTransformer
 
 from app.config import INDEX_DIR, EMBEDDING_MODEL, RESULTS_PER_TOPIC
 EMBEDDINGS_FILE = INDEX_DIR / "embeddings.npy"
@@ -14,12 +14,12 @@ _embeddings = None
 _metadata = None
 
 
-def _get_model() -> TextEmbedding:
-    """Load the fastembed model (cached)."""
+def _get_model() -> SentenceTransformer:
+    """Load the sentence-transformers model (cached)."""
     global _model
     if _model is None:
         print(f"Loading embedding model: {EMBEDDING_MODEL}...")
-        _model = TextEmbedding(EMBEDDING_MODEL)
+        _model = SentenceTransformer(EMBEDDING_MODEL)
         print("Model loaded.")
     return _model
 
@@ -58,10 +58,9 @@ def index_resources(resources: list[dict]) -> int:
     # Extract documents for embedding
     documents = [r["document"] for r in resources]
 
-    # Generate embeddings using fastembed
+    # Generate embeddings using sentence-transformers
     print(f"Generating embeddings for {len(documents)} resources...")
-    embeddings_list = list(model.embed(documents, batch_size=128))
-    embeddings = np.array(embeddings_list)
+    embeddings = model.encode(documents, batch_size=128, show_progress_bar=True)
 
     # Normalize embeddings for cosine similarity via dot product
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -109,8 +108,8 @@ def query_similar(query_text: str, n_results: int = RESULTS_PER_TOPIC) -> list[d
 
     model = _get_model()
 
-    # Encode query using fastembed
-    query_embedding = list(model.embed([query_text]))[0]
+    # Encode query using sentence-transformers
+    query_embedding = model.encode([query_text])[0]
 
     # Normalize
     norm = np.linalg.norm(query_embedding)

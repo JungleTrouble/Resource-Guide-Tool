@@ -361,9 +361,9 @@ function renderLocalPlaylist() {
         const escapedPath = r.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const escapedFilename = r.filename.replace(/'/g, "\\'");
         const escapedSource = (r.source || '').replace(/'/g, "\\'");
-        const icon = r.fileType === 'video' ? '&#127909;' :
-                     r.fileType === 'pdf' ? '&#128196;' :
-                     r.fileType === 'anki' ? '&#127183;' : '&#128193;';
+        const icon = r.fileType === 'video' ? 'VID' :
+                     r.fileType === 'pdf' ? 'PDF' :
+                     r.fileType === 'anki' ? 'ANK' : 'DIR';
         return '<div class="resource-item" onclick="openResource(\'' + escapedPath + '\')">' +
             '<div class="resource-icon">' + icon + '</div>' +
             '<div class="resource-info">' +

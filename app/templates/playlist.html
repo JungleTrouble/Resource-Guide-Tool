@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if playlist %}{{ playlist.name }}{% else %}My Playlist{% endif %} - Resource Guide AI</title>
+    <title>{% if playlist %}{{ playlist.name }}{% else %}Playlist{% endif %} - Resource Guide AI</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -11,13 +11,13 @@
 
     <div class="container">
         <header>
-            <a href="/" class="back-link">&larr; Back to Home</a>
-            <h1>{% if playlist %}{{ playlist.name }}{% else %}My Playlist{% endif %}</h1>
+            <a href="/" class="back-link">&larr; Home</a>
+            <h1>{% if playlist %}{{ playlist.name }}{% else %}Playlist{% endif %}</h1>
             <p class="subtitle">
                 {% if code and playlist %}
-                Shared playlist &middot; Code: <strong>{{ code }}</strong>
+                Shared playlist &middot; Code: <code>{{ code }}</code>
                 {% else %}
-                Build a playlist of resources to study together
+                Build a collection of resources to study together
                 {% endif %}
             </p>
         </header>
@@ -28,9 +28,8 @@
 
         <!-- Load Playlist Section -->
         <div class="card">
-            <h2>Load a Shared Playlist</h2>
+            <h2 style="font-size:0.95rem; font-weight:700; letter-spacing:-0.025em; margin-bottom:0.5rem;">Load a Shared Playlist</h2>
             <div class="search-input-wrapper">
-                <span class="search-icon">&#128279;</span>
                 <input type="text" id="playlistCodeInput" class="search-input"
                        placeholder="Paste a playlist code, e.g. abc123" maxlength="8">
                 <button class="btn btn-primary search-btn" onclick="loadPlaylistByCode()">Load</button>
@@ -40,7 +39,7 @@
         <!-- Playlist Contents -->
         <div class="card">
             <div class="playlist-header-row">
-                <h2 id="playlistTitle">
+                <h2 id="playlistTitle" style="font-size:0.95rem; font-weight:700; letter-spacing:-0.025em; margin:0;">
                     {% if playlist %}
                     {{ playlist.resources | length }} resource{{ "s" if playlist.resources | length != 1 }}
                     {% else %}
@@ -50,9 +49,9 @@
                 <div class="playlist-actions">
                     <button class="btn btn-primary btn-sm" id="shareBtn" onclick="sharePlaylist()"
                         {% if not playlist %}style="display:none;"{% endif %}>
-                        Share Playlist
+                        Share
                     </button>
-                    <button class="btn btn-secondary btn-sm" id="clearBtn" onclick="clearPlaylist()"
+                    <button class="btn-text" id="clearBtn" onclick="clearPlaylist()"
                         {% if not playlist %}style="display:none;"{% endif %}>
                         Clear
                     </button>
@@ -71,10 +70,10 @@
                     {% for resource in playlist.resources %}
                     <div class="resource-item" onclick="openResource('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
                         <div class="resource-icon">
-                            {% if resource.fileType == "video" %}&#127909;
-                            {% elif resource.fileType == "pdf" %}&#128196;
-                            {% elif resource.fileType == "anki" %}&#127183;
-                            {% else %}&#128193;{% endif %}
+                            {% if resource.fileType == "video" %}VID
+                            {% elif resource.fileType == "pdf" %}PDF
+                            {% elif resource.fileType == "anki" %}ANK
+                            {% else %}DIR{% endif %}
                         </div>
                         <div class="resource-info">
                             <div class="resource-name resource-link">{{ resource.filename }}</div>
@@ -101,8 +100,7 @@
         </div>
 
         <footer>
-            <a href="/search" class="btn btn-secondary">Search Resources</a>
-            <a href="/" class="btn btn-primary" style="margin-left:0.5rem;">Upload a PDF</a>
+            <a href="/search">Search Resources</a> &middot; <a href="/">Upload a PDF</a>
         </footer>
     </div>
 

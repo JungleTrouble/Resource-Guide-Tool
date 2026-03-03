@@ -12,7 +12,7 @@
     <div class="container">
         <header>
             <h1>Resource Guide AI</h1>
-            <p class="subtitle">Upload a lecture PDF and get personalized study resource recommendations</p>
+            <p class="subtitle">Medical study resource search and recommendations</p>
         </header>
 
         {% if error %}
@@ -21,39 +21,10 @@
 
         <div id="indexAlert" class="alert alert-success" style="display:none;"></div>
 
-        <div class="card">
-            <div class="index-status">
-                <span class="status-badge" id="statusBadge">
-                    {% if index_count > 0 %}
-                    <span class="status-ready">{{ index_count }} resources indexed</span>
-                    {% else %}
-                    <span class="status-empty">No resources indexed</span>
-                    {% endif %}
-                </span>
-
-                <button type="button" class="btn btn-secondary" id="indexBtn" onclick="startIndexing()">
-                    {% if index_count > 0 %}Re-index Resources{% else %}Index Resources{% endif %}
-                </button>
-            </div>
-            <div id="indexProgress" style="display:none; margin-top:0.75rem; font-size:0.9rem; color:var(--text-muted);">
-                <div class="spinner-small"></div>
-                <span id="indexProgressText">Starting...</span>
-            </div>
-
-            {% if source_counts %}
-            <div class="source-breakdown">
-                {% for source, count in source_counts.items() | sort(attribute='1', reverse=true) %}
-                <span class="source-chip">{{ source }} ({{ count }})</span>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-
         <div class="card search-card">
             <h2>Search Resources</h2>
             <form action="/search" method="get" class="search-form">
                 <div class="search-input-wrapper">
-                    <span class="search-icon">&#128269;</span>
                     <input
                         type="text"
                         name="q"
@@ -68,20 +39,31 @@
         </div>
 
         <div class="card">
-            <div class="playlist-header-row">
-                <h2 style="margin:0;">Playlists</h2>
-                <a href="/playlist" class="playlist-link">
-                    My Playlist <span class="playlist-badge" id="playlistBadge" style="display:none;">0</span>
-                </a>
+            <div class="index-status">
+                <span class="status-badge" id="statusBadge">
+                    {% if index_count > 0 %}
+                    <span class="status-ready">{{ index_count }} resources indexed</span>
+                    {% else %}
+                    <span class="status-empty">No resources indexed</span>
+                    {% endif %}
+                </span>
+
+                <button type="button" class="btn btn-secondary btn-sm" id="indexBtn" onclick="startIndexing()">
+                    {% if index_count > 0 %}Re-index{% else %}Index Resources{% endif %}
+                </button>
             </div>
-            <div style="margin-top:0.75rem;">
-                <div class="search-input-wrapper">
-                    <span class="search-icon">&#128279;</span>
-                    <input type="text" id="playlistCodeInput" class="search-input"
-                           placeholder="Paste a playlist code to load..." maxlength="8">
-                    <button class="btn btn-primary search-btn" onclick="loadPlaylistByCode()">Load</button>
-                </div>
+            <div id="indexProgress" style="display:none; margin-top:0.5rem; font-size:0.8rem; color:var(--text-muted);">
+                <div class="spinner-small"></div>
+                <span id="indexProgressText">Starting...</span>
             </div>
+
+            {% if source_counts %}
+            <div class="source-breakdown">
+                {% for source, count in source_counts.items() | sort(attribute='1', reverse=true) %}
+                <span class="source-chip">{{ source }} ({{ count }})</span>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
 
         <div class="card upload-card">
@@ -89,7 +71,7 @@
             <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
                 <div class="drop-zone" id="dropZone">
                     <div class="drop-zone-content">
-                        <div class="drop-icon">&#128196;</div>
+                        <div class="drop-icon">PDF</div>
                         <p>Drag & drop your PDFs here</p>
                         <p class="drop-hint">or click to browse (supports multiple files)</p>
                     </div>
@@ -102,8 +84,24 @@
             </form>
         </div>
 
+        <div class="card">
+            <div class="playlist-header-row">
+                <h2 style="margin:0; font-size:0.95rem; font-weight:700; letter-spacing:-0.025em;">Playlists</h2>
+                <a href="/playlist" class="playlist-link">
+                    Playlist <span class="playlist-badge" id="playlistBadge" style="display:none;">0</span>
+                </a>
+            </div>
+            <div style="margin-top:0.5rem;">
+                <div class="search-input-wrapper">
+                    <input type="text" id="playlistCodeInput" class="search-input"
+                           placeholder="Paste a playlist code to load..." maxlength="8">
+                    <button class="btn btn-primary search-btn" onclick="loadPlaylistByCode()">Load</button>
+                </div>
+            </div>
+        </div>
+
         <footer>
-            <p>Powered by sentence-transformers</p>
+            <a href="/search">Search</a> &middot; <a href="/playlist">Playlist</a>
         </footer>
     </div>
 
