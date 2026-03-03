@@ -21,15 +21,19 @@ function openResource(path) {
         .then(r => r.json())
         .then(data => {
             if (data.status === 'cloud') {
-                navigator.clipboard.writeText(path);
-                if (data.driveUrl) {
+                if (data.fileUrl) {
+                    // Direct per-file link (OneDrive)
+                    window.open(data.fileUrl, '_blank');
+                } else if (data.driveUrl) {
+                    // Fallback: open generic Drive folder + copy path
+                    navigator.clipboard.writeText(path);
                     window.open(data.driveUrl, '_blank');
-                }
-                const toast = document.getElementById('copyToast');
-                if (toast) {
-                    toast.textContent = 'Path copied — find this file in the Google Drive folder';
-                    toast.classList.add('show');
-                    setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 3000);
+                    const toast = document.getElementById('copyToast');
+                    if (toast) {
+                        toast.textContent = 'Path copied — find this file in the Drive folder';
+                        toast.classList.add('show');
+                        setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 3000);
+                    }
                 }
             } else if (data.error) {
                 alert('Could not open file: ' + data.error);

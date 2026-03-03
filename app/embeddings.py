@@ -164,6 +164,17 @@ def keyword_search(query: str, n_results: int = 20) -> list[dict]:
     return results[:n_results]
 
 
+def get_file_link(relative_path: str) -> str | None:
+    """Get the direct OneDrive link for a resource by its relative path."""
+    _load_index()
+    if not _metadata:
+        return None
+    for meta in _metadata:
+        if meta.get("relative_path") == relative_path:
+            return meta.get("onedrive_link")
+    return None
+
+
 def get_index_count() -> int:
     """Return the number of resources currently indexed."""
     _load_index()

@@ -196,7 +196,12 @@ async def open_file(path: str = ""):
         return JSONResponse({"error": "No path provided"}, status_code=400)
 
     if IS_CLOUD:
-        # On cloud, we can't open local files — direct to Google Drive
+        # On cloud, check for a direct per-file link first
+        from app.embeddings import get_file_link
+        file_link = get_file_link(path)
+        if file_link:
+            return JSONResponse({"status": "cloud", "path": path, "fileUrl": file_link})
+        # Fall back to generic Drive folder
         return JSONResponse({"status": "cloud", "path": path, "driveUrl": DRIVE_URL})
 
     # Resolve the full path within the resources directory

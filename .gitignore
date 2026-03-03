@@ -17,6 +17,11 @@ data/uploads/
 Thumbs.db
 
 # Index data (generated at runtime)
+data/index/onedrive_raw_scan.json
+data/index/onedrive_links.json
+
+# Nested repo copy
+Resource-Guide-AI/
 
 # Claude
 .claude/
