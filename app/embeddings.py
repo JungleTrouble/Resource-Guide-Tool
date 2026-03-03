@@ -169,8 +169,12 @@ def get_file_link(relative_path: str) -> str | None:
     _load_index()
     if not _metadata:
         return None
+    # Normalize to both slash formats for matching
+    fwd = relative_path.replace("\\", "/")
+    bk = relative_path.replace("/", "\\")
     for meta in _metadata:
-        if meta.get("relative_path") == relative_path:
+        rp = meta.get("relative_path", "")
+        if rp == relative_path or rp == fwd or rp == bk:
             return meta.get("onedrive_link")
     return None
 
