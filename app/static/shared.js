@@ -22,18 +22,11 @@ function openResource(path) {
         .then(data => {
             if (data.status === 'cloud') {
                 if (data.fileUrl) {
-                    // Direct per-file link (OneDrive)
                     window.open(data.fileUrl, '_blank');
                 } else if (data.driveUrl) {
-                    // Fallback: open generic Drive folder + copy path
                     navigator.clipboard.writeText(path);
                     window.open(data.driveUrl, '_blank');
-                    const toast = document.getElementById('copyToast');
-                    if (toast) {
-                        toast.textContent = 'Path copied — find this file in the Drive folder';
-                        toast.classList.add('show');
-                        setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 3000);
-                    }
+                    showToast('Path copied — find this file in the Drive folder', 3000);
                 }
             } else if (data.error) {
                 alert('Could not open file: ' + data.error);
@@ -42,22 +35,25 @@ function openResource(path) {
         .catch(() => alert('Could not open file.'));
 }
 
+// === Toast ===
+function showToast(msg, duration) {
+    duration = duration || 2000;
+    const toast = document.getElementById('copyToast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, duration);
+}
+
 // === Copy Path ===
 function copyPath(path) {
-    navigator.clipboard.writeText(path).then(() => {
-        const toast = document.getElementById('copyToast');
-        if (toast) {
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2000);
-        }
-    });
+    navigator.clipboard.writeText(path).then(() => showToast('Path copied to clipboard'));
 }
 
 // === Bookmarks ===
 function getBookmarks() {
-    try {
-        return JSON.parse(localStorage.getItem('bookmarks') || '[]');
-    } catch { return []; }
+    try { return JSON.parse(localStorage.getItem('bookmarks') || '[]'); }
+    catch { return []; }
 }
 
 function saveBookmarks(bookmarks) {
@@ -86,7 +82,6 @@ function toggleBookmark(path, filename, source, fileType, btn) {
 // Restore bookmark states on page load
 (function () {
     document.querySelectorAll('.action-icon[title="Bookmark"]').forEach(btn => {
-        // Extract path from the onclick attribute of the parent resource-item
         const item = btn.closest('.resource-item');
         if (!item) return;
         const onclick = item.getAttribute('onclick');
@@ -114,26 +109,17 @@ function filterSources() {
         }
     });
 
-    // Show/hide source groups
     document.querySelectorAll('.source-group[data-source]').forEach(group => {
-        if (activeSources.size === 0 || activeSources.has(group.dataset.source)) {
-            group.style.display = '';
-        } else {
-            group.style.display = 'none';
-        }
+        group.style.display = (activeSources.size === 0 || activeSources.has(group.dataset.source)) ? '' : 'none';
     });
 }
 
 // === Export Checklist ===
 function exportChecklist() {
-    let text = 'Study Resource Checklist\n';
-    text += '========================\n\n';
-
-    // Check if we're on search page or results page
+    let text = 'Study Resource Checklist\n========================\n\n';
     const topicCards = document.querySelectorAll('.topic-card');
 
     if (topicCards.length > 0) {
-        // Results page — export by topic
         topicCards.forEach(card => {
             const topicName = card.querySelector('.topic-title h2')?.textContent || 'Topic';
             text += '## ' + topicName + '\n';
@@ -151,7 +137,6 @@ function exportChecklist() {
             text += '\n';
         });
     } else {
-        // Search page — export flat list
         document.querySelectorAll('.source-group').forEach(group => {
             if (group.style.display === 'none') return;
             const source = group.querySelector('.source-group-name')?.textContent || '';
@@ -166,7 +151,6 @@ function exportChecklist() {
         });
     }
 
-    // Download as text file
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -178,18 +162,14 @@ function exportChecklist() {
 
 // === Recent Searches ===
 function getRecentSearches() {
-    try {
-        return JSON.parse(localStorage.getItem('recentSearches') || '[]');
-    } catch { return []; }
+    try { return JSON.parse(localStorage.getItem('recentSearches') || '[]'); }
+    catch { return []; }
 }
 
 function saveRecentSearch(query) {
     let recent = getRecentSearches();
-    // Remove if already exists
     recent = recent.filter(q => q.toLowerCase() !== query.toLowerCase());
-    // Add to front
     recent.unshift(query);
-    // Keep only 5
     recent = recent.slice(0, 5);
     localStorage.setItem('recentSearches', JSON.stringify(recent));
 }
@@ -199,24 +179,84 @@ function renderRecentSearches() {
     if (!container) return;
     const recent = getRecentSearches();
     if (recent.length === 0) return;
-
     container.innerHTML = '<span class="recent-label">Recent:</span>' +
         recent.map(q => '<a href="/search?q=' + encodeURIComponent(q) + '" class="recent-chip">' + q + '</a>').join('');
 }
 
-// === Playlist ===
-function getPlaylist() {
+
+// ============================================================
+//  MULTI-PLAYLIST SYSTEM
+// ============================================================
+
+function _generateId() {
+    return 'pl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+// -- Storage helpers --
+
+function getAllPlaylists() {
+    try { return JSON.parse(localStorage.getItem('playlists') || '[]'); }
+    catch { return []; }
+}
+
+function _saveAllPlaylists(playlists) {
+    localStorage.setItem('playlists', JSON.stringify(playlists));
+}
+
+function getActivePlaylistId() {
+    return localStorage.getItem('activePlaylistId') || '';
+}
+
+function setActivePlaylistId(id) {
+    localStorage.setItem('activePlaylistId', id);
+}
+
+// -- Migration from old single-playlist format --
+
+function migratePlaylistStorage() {
+    if (localStorage.getItem('playlists')) return; // already migrated
+    const old = localStorage.getItem('currentPlaylist');
+    if (!old) {
+        // No old data — create default empty playlist
+        const id = _generateId();
+        _saveAllPlaylists([{ id: id, code: null, name: 'My Playlist', description: '', resources: [], createdAt: Date.now() }]);
+        setActivePlaylistId(id);
+        return;
+    }
     try {
-        return JSON.parse(localStorage.getItem('currentPlaylist') || 'null');
-    } catch { return null; }
+        const parsed = JSON.parse(old);
+        const id = _generateId();
+        const migrated = {
+            id: id,
+            code: parsed.code || null,
+            name: parsed.name || 'My Playlist',
+            description: '',
+            resources: parsed.resources || [],
+            createdAt: Date.now(),
+        };
+        _saveAllPlaylists([migrated]);
+        setActivePlaylistId(id);
+        localStorage.removeItem('currentPlaylist');
+    } catch {
+        const id = _generateId();
+        _saveAllPlaylists([{ id: id, code: null, name: 'My Playlist', description: '', resources: [], createdAt: Date.now() }]);
+        setActivePlaylistId(id);
+        localStorage.removeItem('currentPlaylist');
+    }
 }
 
-function savePlaylistRaw(playlist) {
-    localStorage.setItem('currentPlaylist', JSON.stringify(playlist));
+// -- Playlist accessors --
+
+function getActivePlaylist() {
+    const all = getAllPlaylists();
+    const activeId = getActivePlaylistId();
+    return all.find(p => p.id === activeId) || all[0] || null;
 }
 
-function savePlaylistToLocal(code, name, resources) {
-    savePlaylistRaw({ code: code, name: name, resources: resources });
+// Backward-compatible wrappers
+function getPlaylist() {
+    migratePlaylistStorage();
+    return getActivePlaylist();
 }
 
 function getPlaylistResources() {
@@ -228,22 +268,47 @@ function isInPlaylist(path) {
     return getPlaylistResources().some(r => r.path === path);
 }
 
-function addToPlaylist(path, filename, source, fileType, btn) {
-    let pl = getPlaylist() || { code: null, name: 'My Playlist', resources: [] };
-    if (pl.resources.some(r => r.path === path)) {
-        // Remove (toggle off)
-        pl.resources = pl.resources.filter(r => r.path !== path);
-        if (btn) {
-            btn.classList.remove('in-playlist');
-            btn.innerHTML = '&#43;';
-        }
+function savePlaylistRaw(playlist) {
+    const all = getAllPlaylists();
+    const idx = all.findIndex(p => p.id === playlist.id);
+    if (idx >= 0) {
+        all[idx] = playlist;
     } else {
-        // Add
+        all.push(playlist);
+    }
+    _saveAllPlaylists(all);
+}
+
+function savePlaylistToLocal(code, name, resources) {
+    migratePlaylistStorage();
+    const pl = getActivePlaylist();
+    if (pl) {
+        pl.code = code;
+        pl.name = name;
+        pl.resources = resources;
+        savePlaylistRaw(pl);
+    }
+}
+
+// -- Playlist operations --
+
+function addToPlaylist(path, filename, source, fileType, btn) {
+    migratePlaylistStorage();
+    let pl = getActivePlaylist();
+    if (!pl) {
+        const id = _generateId();
+        pl = { id: id, code: null, name: 'My Playlist', description: '', resources: [], createdAt: Date.now() };
+        const all = getAllPlaylists();
+        all.push(pl);
+        _saveAllPlaylists(all);
+        setActivePlaylistId(id);
+    }
+    if (pl.resources.some(r => r.path === path)) {
+        pl.resources = pl.resources.filter(r => r.path !== path);
+        if (btn) { btn.classList.remove('in-playlist'); btn.innerHTML = '&#43;'; }
+    } else {
         pl.resources.push({ path, filename, source, fileType });
-        if (btn) {
-            btn.classList.add('in-playlist');
-            btn.innerHTML = '&#10003;';
-        }
+        if (btn) { btn.classList.add('in-playlist'); btn.innerHTML = '&#10003;'; }
     }
     pl.code = null;
     savePlaylistRaw(pl);
@@ -251,24 +316,77 @@ function addToPlaylist(path, filename, source, fileType, btn) {
 }
 
 function removeFromPlaylist(path) {
-    let pl = getPlaylist();
+    const pl = getActivePlaylist();
     if (!pl) return;
     pl.resources = pl.resources.filter(r => r.path !== path);
     pl.code = null;
     savePlaylistRaw(pl);
-    if (typeof renderLocalPlaylist === 'function') {
-        renderLocalPlaylist();
-    }
+    if (document.getElementById('playlistResources')) renderPlaylistPage();
     updatePlaylistCount();
 }
 
 function clearPlaylist() {
-    if (!confirm('Clear your entire playlist?')) return;
-    localStorage.removeItem('currentPlaylist');
-    if (typeof renderLocalPlaylist === 'function') {
-        renderLocalPlaylist();
-    }
+    if (!confirm('Clear all resources from this playlist?')) return;
+    const pl = getActivePlaylist();
+    if (!pl) return;
+    pl.resources = [];
+    pl.code = null;
+    savePlaylistRaw(pl);
+    if (document.getElementById('playlistResources')) renderPlaylistPage();
     updatePlaylistCount();
+}
+
+function createNewPlaylist() {
+    const name = prompt('Playlist name:', 'New Playlist');
+    if (!name) return;
+    const id = _generateId();
+    const pl = { id: id, code: null, name: name.trim(), description: '', resources: [], createdAt: Date.now() };
+    const all = getAllPlaylists();
+    all.push(pl);
+    _saveAllPlaylists(all);
+    setActivePlaylistId(id);
+    renderPlaylistPage();
+    updatePlaylistCount();
+}
+
+function deleteActivePlaylist() {
+    const all = getAllPlaylists();
+    if (all.length <= 1) {
+        alert('You need at least one playlist.');
+        return;
+    }
+    if (!confirm('Delete this playlist?')) return;
+    const activeId = getActivePlaylistId();
+    const filtered = all.filter(p => p.id !== activeId);
+    _saveAllPlaylists(filtered);
+    setActivePlaylistId(filtered[0].id);
+    renderPlaylistPage();
+    updatePlaylistCount();
+}
+
+function switchPlaylist(id) {
+    setActivePlaylistId(id);
+    renderPlaylistPage();
+    updatePlaylistCount();
+}
+
+function importSharedPlaylist(code, playlistData) {
+    migratePlaylistStorage();
+    const id = _generateId();
+    const pl = {
+        id: id,
+        code: code,
+        name: playlistData.name + ' (imported)',
+        description: playlistData.description || '',
+        resources: playlistData.resources || [],
+        createdAt: Date.now(),
+    };
+    const all = getAllPlaylists();
+    all.push(pl);
+    _saveAllPlaylists(all);
+    setActivePlaylistId(id);
+    showToast('Playlist imported!', 2000);
+    window.location.href = '/playlist';
 }
 
 function updatePlaylistCount() {
@@ -280,7 +398,7 @@ function updatePlaylistCount() {
 }
 
 function sharePlaylist() {
-    const pl = getPlaylist();
+    const pl = getActivePlaylist();
     if (!pl || pl.resources.length === 0) {
         alert('Add resources to your playlist first.');
         return;
@@ -288,20 +406,19 @@ function sharePlaylist() {
 
     const name = prompt('Name your playlist:', pl.name || 'My Playlist');
     if (!name) return;
+    const description = prompt('Add a description (optional):', pl.description || '') || '';
 
     fetch('/api/playlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name, resources: pl.resources }),
+        body: JSON.stringify({ name: name, description: description, resources: pl.resources }),
     })
     .then(r => r.json())
     .then(data => {
-        if (data.error) {
-            alert('Error: ' + data.error);
-            return;
-        }
+        if (data.error) { alert('Error: ' + data.error); return; }
         pl.code = data.code;
         pl.name = name;
+        pl.description = description;
         savePlaylistRaw(pl);
 
         const resultEl = document.getElementById('shareResult');
@@ -315,16 +432,9 @@ function sharePlaylist() {
 }
 
 function copyShareCode() {
-    const pl = getPlaylist();
+    const pl = getActivePlaylist();
     if (!pl || !pl.code) return;
-    navigator.clipboard.writeText(pl.code).then(() => {
-        const toast = document.getElementById('copyToast');
-        if (toast) {
-            toast.textContent = 'Playlist code copied!';
-            toast.classList.add('show');
-            setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Path copied to clipboard'; }, 2000);
-        }
-    });
+    navigator.clipboard.writeText(pl.code).then(() => showToast('Playlist code copied!'));
 }
 
 function loadPlaylistByCode() {
@@ -335,31 +445,42 @@ function loadPlaylistByCode() {
     window.location.href = '/playlist/' + encodeURIComponent(code);
 }
 
-function renderLocalPlaylist() {
-    const pl = getPlaylist();
+// -- Playlist Page Rendering --
+
+function renderPlaylistPage() {
+    const selector = document.getElementById('playlistSelector');
     const container = document.getElementById('playlistResources');
     const emptyMsg = document.getElementById('playlistEmpty');
-    const titleEl = document.getElementById('playlistTitle');
     const shareBtn = document.getElementById('shareBtn');
-    const clearBtn = document.getElementById('clearBtn');
+    const deleteBtn = document.getElementById('deletePlaylistBtn');
 
     if (!container) return;
+
+    const all = getAllPlaylists();
+    const pl = getActivePlaylist();
+
+    // Render selector
+    if (selector) {
+        selector.innerHTML = all.map(p =>
+            '<option value="' + p.id + '"' + (pl && p.id === pl.id ? ' selected' : '') + '>' +
+            p.name + ' (' + p.resources.length + ')' +
+            '</option>'
+        ).join('');
+    }
 
     const resources = pl ? pl.resources || [] : [];
 
     if (resources.length === 0) {
         container.innerHTML = '';
         if (emptyMsg) emptyMsg.style.display = '';
-        if (titleEl) titleEl.textContent = '0 resources';
         if (shareBtn) shareBtn.style.display = 'none';
-        if (clearBtn) clearBtn.style.display = 'none';
+        if (deleteBtn) deleteBtn.style.display = all.length > 1 ? '' : 'none';
         return;
     }
 
     if (emptyMsg) emptyMsg.style.display = 'none';
-    if (titleEl) titleEl.textContent = resources.length + ' resource' + (resources.length !== 1 ? 's' : '');
     if (shareBtn) shareBtn.style.display = '';
-    if (clearBtn) clearBtn.style.display = '';
+    if (deleteBtn) deleteBtn.style.display = all.length > 1 ? '' : 'none';
 
     container.innerHTML = resources.map(r => {
         const escapedPath = r.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -384,8 +505,15 @@ function renderLocalPlaylist() {
     }).join('');
 }
 
+// Backward compat
+function renderLocalPlaylist() {
+    migratePlaylistStorage();
+    renderPlaylistPage();
+}
+
 // Restore playlist button states on page load
 (function() {
+    migratePlaylistStorage();
     document.querySelectorAll('.action-icon[title="Add to playlist"]').forEach(btn => {
         const item = btn.closest('.resource-item');
         if (!item) return;
@@ -400,9 +528,145 @@ function renderLocalPlaylist() {
     updatePlaylistCount();
 })();
 
+
+// ============================================================
+//  TAGS SYSTEM
+// ============================================================
+
+let _allTagNames = null;
+
+function loadTagsForPaths(paths) {
+    if (!paths || paths.length === 0) return;
+    fetch('/api/tags')
+        .then(r => r.json())
+        .then(allTags => {
+            paths.forEach(path => {
+                const tags = allTags[path] || [];
+                renderTagsForPath(path, tags);
+            });
+        })
+        .catch(() => {});
+}
+
+function renderTagsForPath(path, tags) {
+    // Use attribute selector with proper escaping
+    document.querySelectorAll('.resource-tags').forEach(container => {
+        if (container.dataset.path !== path) return;
+        if (tags.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        const escapedPath = path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        container.innerHTML = tags.map(tag =>
+            '<span class="tag-pill" onclick="event.stopPropagation(); removeTag(\'' + escapedPath + '\', \'' + tag.replace(/'/g, "\\'") + '\')" title="Click to remove">' +
+            tag + ' &times;</span>'
+        ).join('');
+    });
+}
+
+function showTagInput(btn, path) {
+    const existing = btn.closest('.resource-actions')?.querySelector('.tag-input-inline');
+    if (existing) { existing.remove(); return; }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tag-input-inline';
+    wrapper.onclick = function(e) { e.stopPropagation(); };
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'tag-input';
+    input.placeholder = 'tag...';
+    input.maxLength = 50;
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'tag-autocomplete';
+
+    input.addEventListener('input', function() {
+        const val = input.value.trim().toLowerCase();
+        if (!val) { dropdown.innerHTML = ''; dropdown.style.display = 'none'; return; }
+        if (!_allTagNames) {
+            fetch('/api/tags/all-names').then(r => r.json()).then(names => {
+                _allTagNames = names;
+                showAutocomplete(val, names, dropdown, input, path);
+            });
+        } else {
+            showAutocomplete(val, _allTagNames, dropdown, input, path);
+        }
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const tag = input.value.trim();
+            if (tag) addTag(path, tag, wrapper);
+        }
+        if (e.key === 'Escape') {
+            wrapper.remove();
+        }
+    });
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(dropdown);
+    btn.closest('.resource-actions').appendChild(wrapper);
+    input.focus();
+}
+
+function showAutocomplete(val, names, dropdown, input, path) {
+    const matches = names.filter(n => n.includes(val) && n !== val).slice(0, 5);
+    if (matches.length === 0) { dropdown.style.display = 'none'; return; }
+    dropdown.style.display = '';
+    dropdown.innerHTML = matches.map(m =>
+        '<div class="tag-autocomplete-item">' + m + '</div>'
+    ).join('');
+    dropdown.querySelectorAll('.tag-autocomplete-item').forEach(item => {
+        item.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            input.value = item.textContent;
+            const wrapper = input.closest('.tag-input-inline');
+            addTag(path, item.textContent, wrapper);
+        });
+    });
+}
+
+function addTag(path, tag, inputWrapper) {
+    tag = tag.trim().toLowerCase().slice(0, 50);
+    if (!tag) return;
+
+    fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resource_path: path, tag: tag }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { alert(data.error); return; }
+        renderTagsForPath(path, data.tags);
+        if (_allTagNames && !_allTagNames.includes(tag)) {
+            _allTagNames.push(tag);
+            _allTagNames.sort();
+        }
+        if (inputWrapper) inputWrapper.remove();
+    })
+    .catch(() => alert('Could not add tag.'));
+}
+
+function removeTag(path, tag) {
+    fetch('/api/tags', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resource_path: path, tag: tag }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { alert(data.error); return; }
+        renderTagsForPath(path, data.tags);
+    })
+    .catch(() => alert('Could not remove tag.'));
+}
+
+
 // === Keyboard Shortcuts ===
 document.addEventListener('keydown', function (e) {
-    // "/" to focus search
     if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
         const input = document.querySelector('.search-input');
         if (input && document.activeElement !== input) {
@@ -410,11 +674,11 @@ document.addEventListener('keydown', function (e) {
             input.focus();
         }
     }
-    // Escape to blur search
     if (e.key === 'Escape') {
         const input = document.querySelector('.search-input');
         if (input && document.activeElement === input) {
             input.blur();
         }
+        document.querySelectorAll('.tag-input-inline').forEach(el => el.remove());
     }
 });

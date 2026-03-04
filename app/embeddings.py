@@ -208,6 +208,74 @@ def get_all_sources() -> list[str]:
     return sources
 
 
+def get_browse_hierarchy() -> list[dict]:
+    """Return a hierarchical structure of sources and their subjects.
+
+    Returns a list like:
+    [
+        {"name": "Pathoma", "count": 120, "subjects": [
+            {"name": "Cardiology", "count": 15},
+            {"name": "Hematology", "count": 20},
+            ...
+        ]},
+        ...
+    ]
+    Sorted by resource count descending.
+    """
+    _load_index()
+    if not _metadata:
+        return []
+
+    # Build source -> subject -> count mapping
+    hierarchy: dict[str, dict[str, int]] = {}
+    for meta in _metadata:
+        source = meta.get("source", "Unknown")
+        subject = meta.get("subject", "General")
+        if source not in hierarchy:
+            hierarchy[source] = {}
+        hierarchy[source][subject] = hierarchy[source].get(subject, 0) + 1
+
+    # Convert to list format
+    result = []
+    for source_name, subjects in hierarchy.items():
+        total_count = sum(subjects.values())
+        subject_list = [
+            {"name": subj, "count": cnt}
+            for subj, cnt in sorted(subjects.items(), key=lambda x: (-x[1], x[0]))
+        ]
+        result.append({
+            "name": source_name,
+            "count": total_count,
+            "subjects": subject_list,
+        })
+
+    # Sort sources by count descending
+    result.sort(key=lambda s: (-s["count"], s["name"]))
+    return result
+
+
+def get_resources_by_source_subject(source: str, subject: str) -> list[dict]:
+    """Return all resources matching a source and subject, sorted by filename."""
+    _load_index()
+    if not _metadata:
+        return []
+
+    resources = []
+    for meta in _metadata:
+        if meta.get("source") == source and meta.get("subject") == subject:
+            resources.append({
+                "source": meta["source"],
+                "subject": meta["subject"],
+                "filename": meta["filename"],
+                "relative_path": meta["relative_path"],
+                "file_type": meta["file_type"],
+                "description": meta.get("document", ""),
+            })
+
+    resources.sort(key=lambda r: r["filename"].lower())
+    return resources
+
+
 def clear_index():
     """Clear the index files and cache."""
     global _embeddings, _metadata

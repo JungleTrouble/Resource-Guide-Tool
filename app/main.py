@@ -15,7 +15,14 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from app.config import DRIVE_URL, IS_CLOUD, RESOURCES_DIR, UPLOAD_DIR
-from app.embeddings import clear_index, get_index_count, get_source_counts, index_resources
+from app.embeddings import (
+    clear_index,
+    get_browse_hierarchy,
+    get_index_count,
+    get_resources_by_source_subject,
+    get_source_counts,
+    index_resources,
+)
 from app.indexer import scan_resources
 from app.recommender import recommend, recommend_multi, search_resources
 
@@ -189,6 +196,82 @@ async def search(request: Request, q: str = ""):
     )
 
 
+@app.get("/browse", response_class=HTMLResponse)
+async def browse(request: Request, source: str = "", subject: str = ""):
+    """Browse resources by source and subject hierarchy."""
+    if get_index_count() == 0:
+        return templates.TemplateResponse(
+            "browse.html",
+            {
+                "request": request,
+                "error": "Resources haven't been indexed yet. Go back and click 'Index Resources' first.",
+                "hierarchy": [],
+                "source": "",
+                "subject": "",
+                "subjects": [],
+                "resources": [],
+                "index_count": 0,
+            },
+        )
+
+    hierarchy = get_browse_hierarchy()
+
+    if source and subject:
+        # Level 3: show resources for a specific source + subject
+        resources = get_resources_by_source_subject(source, subject)
+        # Get subjects for sidebar
+        subjects = []
+        for h in hierarchy:
+            if h["name"] == source:
+                subjects = h["subjects"]
+                break
+        return templates.TemplateResponse(
+            "browse.html",
+            {
+                "request": request,
+                "hierarchy": hierarchy,
+                "source": source,
+                "subject": subject,
+                "subjects": subjects,
+                "resources": resources,
+                "index_count": get_index_count(),
+            },
+        )
+    elif source:
+        # Level 2: show subjects for a specific source
+        subjects = []
+        for h in hierarchy:
+            if h["name"] == source:
+                subjects = h["subjects"]
+                break
+        return templates.TemplateResponse(
+            "browse.html",
+            {
+                "request": request,
+                "hierarchy": hierarchy,
+                "source": source,
+                "subject": "",
+                "subjects": subjects,
+                "resources": [],
+                "index_count": get_index_count(),
+            },
+        )
+    else:
+        # Level 1: show all sources
+        return templates.TemplateResponse(
+            "browse.html",
+            {
+                "request": request,
+                "hierarchy": hierarchy,
+                "source": "",
+                "subject": "",
+                "subjects": [],
+                "resources": [],
+                "index_count": get_index_count(),
+            },
+        )
+
+
 @app.get("/open")
 async def open_file(path: str = ""):
     """Open a resource file using the system default application."""
@@ -262,6 +345,7 @@ def _generate_code(existing_codes: set, length: int = 6) -> str:
 
 class PlaylistCreate(BaseModel):
     name: str
+    description: str = ""
     resources: list[dict]
 
 
@@ -280,11 +364,14 @@ async def create_playlist(data: PlaylistCreate):
         if "path" not in r or "filename" not in r:
             return JSONResponse({"error": "Each resource must have 'path' and 'filename'"}, status_code=400)
 
+    description = data.description.strip()[:500] if data.description else ""
+
     with _playlist_lock:
         playlists = _load_playlists()
         code = _generate_code(set(playlists.keys()))
         playlists[code] = {
             "name": name,
+            "description": description,
             "resources": [
                 {
                     "path": r.get("path", ""),
@@ -308,7 +395,12 @@ async def get_playlist_api(code: str):
     playlist = playlists.get(code)
     if not playlist:
         return JSONResponse({"error": "Playlist not found"}, status_code=404)
-    return JSONResponse({"code": code, "name": playlist["name"], "resources": playlist["resources"]})
+    return JSONResponse({
+        "code": code,
+        "name": playlist["name"],
+        "description": playlist.get("description", ""),
+        "resources": playlist["resources"],
+    })
 
 
 @app.get("/playlist", response_class=HTMLResponse)
@@ -334,3 +426,86 @@ async def view_playlist(request: Request, code: str):
             "error": "Playlist not found" if not playlist else None,
         },
     )
+
+
+# === Tags ===
+
+TAGS_FILE = Path("data/tags.json")
+_tags_lock = threading.Lock()
+
+
+def _load_tags() -> dict:
+    """Load tags from disk."""
+    if TAGS_FILE.exists():
+        with open(TAGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_tags(tags: dict):
+    """Save tags to disk."""
+    TAGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(TAGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(tags, f, indent=2, ensure_ascii=False)
+
+
+class TagAction(BaseModel):
+    resource_path: str
+    tag: str
+
+
+@app.post("/api/tags")
+async def add_tag(data: TagAction):
+    """Add a tag to a resource."""
+    tag = data.tag.strip().lower()[:50]
+    path = data.resource_path.strip()
+    if not tag or not path:
+        return JSONResponse({"error": "Tag and resource_path are required"}, status_code=400)
+
+    with _tags_lock:
+        tags = _load_tags()
+        if path not in tags:
+            tags[path] = []
+        if len(tags[path]) >= 20:
+            return JSONResponse({"error": "Maximum 20 tags per resource"}, status_code=400)
+        if tag not in tags[path]:
+            tags[path].append(tag)
+        _save_tags(tags)
+
+    return JSONResponse({"status": "ok", "tags": tags[path]})
+
+
+@app.delete("/api/tags")
+async def remove_tag(data: TagAction):
+    """Remove a tag from a resource."""
+    tag = data.tag.strip().lower()[:50]
+    path = data.resource_path.strip()
+
+    with _tags_lock:
+        tags = _load_tags()
+        if path in tags and tag in tags[path]:
+            tags[path].remove(tag)
+            if not tags[path]:
+                del tags[path]
+            _save_tags(tags)
+
+    return JSONResponse({"status": "ok", "tags": tags.get(path, [])})
+
+
+@app.get("/api/tags")
+async def get_tags(path: str = ""):
+    """Get tags for a resource, or all tags if no path given."""
+    tags = _load_tags()
+    if path:
+        return JSONResponse({"path": path, "tags": tags.get(path, [])})
+    return JSONResponse(tags)
+
+
+@app.get("/api/tags/all-names")
+async def get_all_tag_names():
+    """Return a sorted list of all unique tag names (for autocomplete)."""
+    tags = _load_tags()
+    all_tags = set()
+    for tag_list in tags.values():
+        all_tags.update(tag_list)
+    return JSONResponse(sorted(all_tags))

@@ -120,11 +120,13 @@
                                         </span>
                                     </div>
                                     <div class="resource-path">{{ resource.relative_path }}</div>
+                                    <div class="resource-tags" data-path="{{ resource.relative_path }}"></div>
                                 </div>
                                 <div class="resource-actions" onclick="event.stopPropagation()">
                                     <button class="action-icon" onclick="toggleBookmark('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Bookmark">&#9734;</button>
                                     <button class="action-icon" onclick="copyPath('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
                                     <button class="action-icon" onclick="addToPlaylist('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Add to playlist">&#43;</button>
+                                    <button class="action-icon tag-add-btn" onclick="showTagInput(this, '{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Add tag">&#9868;</button>
                                 </div>
                             </div>
                             {% endfor %}
@@ -142,7 +144,7 @@
         {% endif %}
 
         <footer>
-            <a href="/">Upload Another PDF</a>
+            <a href="/">Home</a> &middot; <a href="/browse">Browse</a> &middot; <a href="/search">Search</a> &middot; <a href="/playlist">Playlist</a>
         </footer>
     </div>
 
@@ -204,6 +206,15 @@
 
         // Set first as active initially
         if (links[0]) links[0].classList.add('active');
+    })();
+
+    // Load tags for visible resources
+    (function() {
+        const tagContainers = document.querySelectorAll('.resource-tags[data-path]');
+        if (tagContainers.length > 0) {
+            const paths = Array.from(tagContainers).map(el => el.dataset.path);
+            loadTagsForPaths(paths);
+        }
     })();
     </script>
 </body>

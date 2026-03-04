@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse - Resource Guide AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">&#9790;</button>
+
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">&larr; Home</a>
+            <h1>Browse Resources</h1>
+            <p class="subtitle">
+                {{ index_count }} resources indexed
+                &middot; <a href="/search">Search</a>
+                &middot; <a href="/playlist" class="playlist-link">Playlist <span class="playlist-badge" id="playlistBadge" style="display:none;">0</span></a>
+            </p>
+        </header>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb">
+            <a href="/browse">All Sources</a>
+            {% if source %}
+            <span class="breadcrumb-sep">&rsaquo;</span>
+            <a href="/browse?source={{ source | urlencode }}">{{ source }}</a>
+            {% endif %}
+            {% if subject %}
+            <span class="breadcrumb-sep">&rsaquo;</span>
+            <span class="breadcrumb-current">{{ subject }}</span>
+            {% endif %}
+        </nav>
+
+        {% if not source %}
+        <!-- Level 1: All Sources -->
+        <div class="browse-grid">
+            {% for src in hierarchy %}
+            <a href="/browse?source={{ src.name | urlencode }}" class="browse-card">
+                <div class="browse-card-name">{{ src.name }}</div>
+                <div class="browse-card-stats">
+                    <span>{{ src.count }} resource{{ "s" if src.count != 1 else "" }}</span>
+                    <span class="browse-card-dot">&middot;</span>
+                    <span>{{ src.subjects | length }} subject{{ "s" if src.subjects | length != 1 else "" }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        {% elif source and not subject %}
+        <!-- Level 2: Subjects within a source -->
+        <div class="browse-layout">
+            <aside class="browse-sidebar">
+                <div class="browse-sidebar-title">Sources</div>
+                {% for src in hierarchy %}
+                <a href="/browse?source={{ src.name | urlencode }}"
+                   class="browse-sidebar-item {% if src.name == source %}active{% endif %}">
+                    <span class="browse-sidebar-name">{{ src.name }}</span>
+                    <span class="browse-sidebar-count">{{ src.count }}</span>
+                </a>
+                {% endfor %}
+            </aside>
+            <div class="browse-main">
+                <div class="browse-grid">
+                    {% for subj in subjects %}
+                    <a href="/browse?source={{ source | urlencode }}&subject={{ subj.name | urlencode }}" class="browse-card browse-card-subject">
+                        <div class="browse-card-name">{{ subj.name }}</div>
+                        <div class="browse-card-stats">
+                            {{ subj.count }} resource{{ "s" if subj.count != 1 else "" }}
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {% elif source and subject %}
+        <!-- Level 3: Resources within a source + subject -->
+        <div class="browse-layout">
+            <aside class="browse-sidebar">
+                <div class="browse-sidebar-title">
+                    <a href="/browse?source={{ source | urlencode }}" style="color:inherit;text-decoration:none;">{{ source }}</a>
+                </div>
+                {% for subj in subjects %}
+                <a href="/browse?source={{ source | urlencode }}&subject={{ subj.name | urlencode }}"
+                   class="browse-sidebar-item {% if subj.name == subject %}active{% endif %}">
+                    <span class="browse-sidebar-name">{{ subj.name }}</span>
+                    <span class="browse-sidebar-count">{{ subj.count }}</span>
+                </a>
+                {% endfor %}
+            </aside>
+            <div class="browse-main">
+                <div class="results-summary">
+                    {{ resources | length }} resource{{ "s" if resources | length != 1 else "" }} in
+                    <strong>{{ source }}</strong> &rsaquo; <strong>{{ subject }}</strong>
+                </div>
+                <div class="source-group">
+                    <div class="resources-list">
+                        {% for resource in resources %}
+                        <div class="resource-item" onclick="openResource('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
+                            <div class="resource-icon">
+                                {% if resource.file_type == "video" %}VID
+                                {% elif resource.file_type == "pdf" %}PDF
+                                {% elif resource.file_type == "anki" %}ANK
+                                {% else %}DIR{% endif %}
+                            </div>
+                            <div class="resource-info">
+                                <div class="resource-name resource-link">{{ resource.filename }}</div>
+                                <div class="resource-meta">
+                                    <span class="source-badge">{{ resource.source }}</span>
+                                </div>
+                                <div class="resource-path">{{ resource.relative_path }}</div>
+                                <div class="resource-tags" data-path="{{ resource.relative_path }}"></div>
+                            </div>
+                            <div class="resource-actions" onclick="event.stopPropagation()">
+                                <button class="action-icon" onclick="toggleBookmark('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Bookmark">&#9734;</button>
+                                <button class="action-icon" onclick="copyPath('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
+                                <button class="action-icon" onclick="addToPlaylist('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Add to playlist">&#43;</button>
+                                <button class="action-icon tag-add-btn" onclick="showTagInput(this, '{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Add tag">&#9868;</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <footer>
+            <a href="/">Home</a> &middot; <a href="/search">Search</a> &middot; <a href="/playlist">Playlist</a>
+        </footer>
+    </div>
+
+    <div class="copy-toast" id="copyToast">Path copied to clipboard</div>
+
+    <script src="/static/shared.js"></script>
+    <script>
+    // Load tags for visible resources
+    (function() {
+        const tagContainers = document.querySelectorAll('.resource-tags[data-path]');
+        if (tagContainers.length === 0) return;
+        const paths = Array.from(tagContainers).map(el => el.dataset.path);
+        loadTagsForPaths(paths);
+    })();
+    </script>
+</body>
+</html>

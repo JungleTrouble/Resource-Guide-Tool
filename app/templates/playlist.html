@@ -12,12 +12,12 @@
     <div class="container">
         <header>
             <a href="/" class="back-link">&larr; Home</a>
-            <h1>{% if playlist %}{{ playlist.name }}{% else %}Playlist{% endif %}</h1>
+            <h1>{% if playlist and code %}{{ playlist.name }}{% else %}Playlists{% endif %}</h1>
             <p class="subtitle">
                 {% if code and playlist %}
                 Shared playlist &middot; Code: <code>{{ code }}</code>
                 {% else %}
-                Build a collection of resources to study together
+                Build collections of resources to study together
                 {% endif %}
             </p>
         </header>
@@ -25,6 +25,55 @@
         {% if error %}
         <div class="alert alert-error">{{ error }}</div>
         {% endif %}
+
+        {% if code and playlist %}
+        <!-- === Viewing a shared playlist === -->
+        {% if playlist.description %}
+        <div class="card" style="font-size:0.85rem; color:var(--text-muted);">
+            {{ playlist.description }}
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="playlist-header-row">
+                <h2 style="font-size:0.95rem; font-weight:700; letter-spacing:-0.025em; margin:0;">
+                    {{ playlist.resources | length }} resource{{ "s" if playlist.resources | length != 1 }}
+                </h2>
+                <div class="playlist-actions">
+                    <button class="btn btn-primary btn-sm" onclick="importSharedPlaylist('{{ code }}', {{ playlist | tojson | replace("'", "\\'") }})">
+                        Import to My Playlists
+                    </button>
+                </div>
+            </div>
+
+            <div class="resources-list">
+                {% for resource in playlist.resources %}
+                <div class="resource-item" onclick="openResource('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
+                    <div class="resource-icon">
+                        {% if resource.fileType == "video" %}VID
+                        {% elif resource.fileType == "pdf" %}PDF
+                        {% elif resource.fileType == "anki" %}ANK
+                        {% else %}DIR{% endif %}
+                    </div>
+                    <div class="resource-info">
+                        <div class="resource-name resource-link">{{ resource.filename }}</div>
+                        <div class="resource-meta">
+                            <span class="source-badge">{{ resource.source }}</span>
+                        </div>
+                        <div class="resource-path">{{ resource.path }}</div>
+                    </div>
+                    <div class="resource-actions" onclick="event.stopPropagation()">
+                        <button class="action-icon" onclick="toggleBookmark('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.fileType }}', this)" title="Bookmark">&#9734;</button>
+                        <button class="action-icon" onclick="copyPath('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
+                        <button class="action-icon" onclick="addToPlaylist('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.fileType }}', this)" title="Add to playlist">&#43;</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% else %}
+        <!-- === Local playlist management === -->
 
         <!-- Load Playlist Section -->
         <div class="card">
@@ -36,24 +85,20 @@
             </div>
         </div>
 
-        <!-- Playlist Contents -->
+        <!-- Playlist Selector -->
         <div class="card">
             <div class="playlist-header-row">
-                <h2 id="playlistTitle" style="font-size:0.95rem; font-weight:700; letter-spacing:-0.025em; margin:0;">
-                    {% if playlist %}
-                    {{ playlist.resources | length }} resource{{ "s" if playlist.resources | length != 1 }}
-                    {% else %}
-                    0 resources
-                    {% endif %}
-                </h2>
+                <div class="playlist-selector-wrapper">
+                    <select id="playlistSelector" class="playlist-selector" onchange="switchPlaylist(this.value)">
+                    </select>
+                </div>
                 <div class="playlist-actions">
-                    <button class="btn btn-primary btn-sm" id="shareBtn" onclick="sharePlaylist()"
-                        {% if not playlist %}style="display:none;"{% endif %}>
+                    <button class="btn btn-secondary btn-sm" onclick="createNewPlaylist()">New</button>
+                    <button class="btn btn-primary btn-sm" id="shareBtn" onclick="sharePlaylist()" style="display:none;">
                         Share
                     </button>
-                    <button class="btn-text" id="clearBtn" onclick="clearPlaylist()"
-                        {% if not playlist %}style="display:none;"{% endif %}>
-                        Clear
+                    <button class="btn-text" id="deletePlaylistBtn" onclick="deleteActivePlaylist()" style="display:none;">
+                        Delete
                     </button>
                 </div>
             </div>
@@ -66,41 +111,18 @@
 
             <!-- Resource list -->
             <div class="resources-list" id="playlistResources">
-                {% if playlist %}
-                    {% for resource in playlist.resources %}
-                    <div class="resource-item" onclick="openResource('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
-                        <div class="resource-icon">
-                            {% if resource.fileType == "video" %}VID
-                            {% elif resource.fileType == "pdf" %}PDF
-                            {% elif resource.fileType == "anki" %}ANK
-                            {% else %}DIR{% endif %}
-                        </div>
-                        <div class="resource-info">
-                            <div class="resource-name resource-link">{{ resource.filename }}</div>
-                            <div class="resource-meta">
-                                <span class="source-badge">{{ resource.source }}</span>
-                            </div>
-                            <div class="resource-path">{{ resource.path }}</div>
-                        </div>
-                        <div class="resource-actions" onclick="event.stopPropagation()">
-                            <button class="action-icon" onclick="toggleBookmark('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.fileType }}', this)" title="Bookmark">&#9734;</button>
-                            <button class="action-icon" onclick="copyPath('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
-                            <button class="action-icon playlist-remove" onclick="removeFromPlaylist('{{ resource.path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Remove">&#10006;</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% endif %}
             </div>
 
-            <div class="search-empty" id="playlistEmpty"
-                {% if playlist and playlist.resources %}style="display:none;"{% endif %}>
+            <div class="search-empty" id="playlistEmpty">
                 <p>Your playlist is empty.</p>
-                <p class="search-empty-hint">Add resources from search results or recommendations using the + button, or load a shared playlist code above.</p>
+                <p class="search-empty-hint">Add resources from search results, browse, or recommendations using the + button.</p>
             </div>
         </div>
 
+        {% endif %}
+
         <footer>
-            <a href="/search">Search Resources</a> &middot; <a href="/">Upload a PDF</a>
+            <a href="/">Home</a> &middot; <a href="/search">Search</a> &middot; <a href="/browse">Browse</a>
         </footer>
     </div>
 
@@ -113,11 +135,11 @@
         const serverCode = {{ code | tojson if code else 'null' }};
 
         if (serverPlaylist && serverCode) {
-            // Viewing a shared playlist — save it locally
-            savePlaylistToLocal(serverCode, serverPlaylist.name, serverPlaylist.resources);
-        } else if (!serverPlaylist) {
-            // No server data — render from localStorage
-            renderLocalPlaylist();
+            // Viewing a shared playlist — no local render needed
+        } else {
+            // Local playlist management
+            migratePlaylistStorage();
+            renderPlaylistPage();
         }
     })();
     </script>
