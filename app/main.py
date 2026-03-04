@@ -509,3 +509,21 @@ async def get_all_tag_names():
     for tag_list in tags.values():
         all_tags.update(tag_list)
     return JSONResponse(sorted(all_tags))
+
+
+# === Browse API (for slide-out panel) ===
+
+
+@app.get("/api/browse/hierarchy")
+async def browse_hierarchy_api():
+    """Return the browse hierarchy as JSON for the slide-out panel."""
+    return JSONResponse(get_browse_hierarchy())
+
+
+@app.get("/api/browse/resources")
+async def browse_resources_api(source: str = "", subject: str = ""):
+    """Return resources for a source+subject as JSON for the slide-out panel."""
+    if not source or not subject:
+        return JSONResponse({"error": "source and subject are required"}, status_code=400)
+    resources = get_resources_by_source_subject(source, subject)
+    return JSONResponse(resources)
