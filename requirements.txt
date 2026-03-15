@@ -5,3 +5,4 @@ pymupdf==1.25.3
 sentence-transformers>=2.2.0
 jinja2==3.1.5
 numpy
+google-genai>=1.0.0

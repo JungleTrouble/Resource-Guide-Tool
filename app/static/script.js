@@ -44,6 +44,13 @@ if (dropZone) {
         uploadBtn.disabled = true;
         uploadBtn.textContent = "Processing...";
         loadingOverlay.classList.add("active");
+
+        // Update loading text based on mode
+        const loadingText = document.getElementById("loadingText");
+        const sgCheckbox = document.getElementById("useStudyGuide");
+        if (loadingText && sgCheckbox && sgCheckbox.checked) {
+            loadingText.textContent = "Generating AI Study Guide with Gemini 2.5... This may take 10-20 seconds.";
+        }
     });
 }
 
@@ -83,6 +90,22 @@ function startIndexing() {
             btn.disabled = false;
             btn.textContent = "Index Resources";
         });
+}
+
+// === AI Study Guide toggle ===
+function toggleStudyGuideMode() {
+    const cb = document.getElementById("useStudyGuide");
+    const form = document.getElementById("uploadForm");
+    const btn = document.getElementById("uploadBtn");
+    if (!cb || !form) return;
+
+    if (cb.checked) {
+        form.action = "/study-guide";
+        if (btn) btn.textContent = "Generate AI Study Guide";
+    } else {
+        form.action = "/upload";
+        if (btn) btn.textContent = "Get Recommendations";
+    }
 }
 
 function pollIndexStatus() {

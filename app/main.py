@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.config import DRIVE_URL, IS_CLOUD, RESOURCES_DIR, UPLOAD_DIR
+from app.config import DRIVE_URL, GEMINI_API_KEY, IS_CLOUD, RESOURCES_DIR, UPLOAD_DIR
 from app.embeddings import (
     clear_index,
     get_browse_hierarchy,
@@ -26,6 +26,7 @@ from app.embeddings import (
 )
 from app.indexer import scan_resources
 from app.recommender import recommend, recommend_multi, search_resources
+from app.study_guide import generate_study_guide, generate_study_guide_multi, is_available as gemini_available
 
 app = FastAPI(title="Resource Guide AI")
 
@@ -67,7 +68,7 @@ async def home(request: Request):
     source_counts = get_source_counts()
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "index_count": index_count, "source_counts": source_counts},
+        {"request": request, "index_count": index_count, "source_counts": source_counts, "gemini_available": gemini_available()},
     )
 
 
@@ -133,6 +134,71 @@ async def upload_pdf(request: Request, pdf: List[UploadFile] = File(...)):
         )
     finally:
         # Clean up uploaded files
+        for path in saved_files:
+            if path.exists():
+                os.remove(path)
+
+
+@app.post("/study-guide", response_class=HTMLResponse)
+async def study_guide(request: Request, pdf: List[UploadFile] = File(...)):
+    """Handle PDF uploads and return an AI-powered study guide."""
+    if get_index_count() == 0:
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "error": "Resources haven't been indexed yet. Click 'Index Resources' first.",
+                "index_count": 0,
+                "source_counts": {},
+                "gemini_available": gemini_available(),
+            },
+        )
+
+    saved_files = []
+    filenames = []
+    try:
+        for uploaded_file in pdf:
+            if not uploaded_file.filename.lower().endswith(".pdf"):
+                continue
+            file_id = str(uuid.uuid4())
+            save_path = UPLOAD_DIR / f"{file_id}.pdf"
+            content = await uploaded_file.read()
+            with open(save_path, "wb") as f:
+                f.write(content)
+            saved_files.append(save_path)
+            filenames.append(uploaded_file.filename)
+
+        if not saved_files:
+            return templates.TemplateResponse(
+                "index.html",
+                {
+                    "request": request,
+                    "error": "Please upload at least one PDF file.",
+                    "index_count": get_index_count(),
+                    "source_counts": get_source_counts(),
+                    "gemini_available": gemini_available(),
+                },
+            )
+
+        # Generate AI study guide
+        if len(saved_files) == 1:
+            results = generate_study_guide(str(saved_files[0]), filenames[0])
+            display_name = filenames[0]
+        else:
+            results = generate_study_guide_multi(
+                [str(p) for p in saved_files], filenames
+            )
+            display_name = f"{len(filenames)} PDFs ({', '.join(filenames)})"
+
+        return templates.TemplateResponse(
+            "study_guide.html",
+            {
+                "request": request,
+                "filename": display_name,
+                "results": results,
+            },
+        )
+    finally:
         for path in saved_files:
             if path.exists():
                 os.remove(path)

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Study Guide - Resource Guide AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">&#9790;</button>
+
+    {% if results.topics | length > 0 and not results.error %}
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="back-link">&larr; Back</a>
+            <div class="sidebar-title">Study Guide</div>
+        </div>
+        <ul class="sidebar-nav">
+            <li>
+                <a href="#sg-summary" class="sidebar-link active" data-topic="summary">
+                    <span class="sidebar-num">&bull;</span>
+                    <span class="sidebar-text">Overview</span>
+                </a>
+            </li>
+            {% if results.study_order %}
+            <li>
+                <a href="#sg-study-order" class="sidebar-link" data-topic="order">
+                    <span class="sidebar-num">&bull;</span>
+                    <span class="sidebar-text">Study Order</span>
+                </a>
+            </li>
+            {% endif %}
+            {% for topic in results.topics %}
+            <li>
+                <a href="#sg-topic-{{ loop.index }}" class="sidebar-link" data-topic="{{ loop.index }}">
+                    <span class="sidebar-num">{{ loop.index }}</span>
+                    <span class="sidebar-text">{{ topic.name }}</span>
+                    {% if topic.importance == "high" %}
+                    <span class="importance-dot importance-high" title="High importance"></span>
+                    {% elif topic.importance == "low" %}
+                    <span class="importance-dot importance-low" title="Low importance"></span>
+                    {% else %}
+                    <span class="importance-dot importance-medium" title="Medium importance"></span>
+                    {% endif %}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    <div class="{% if results.topics | length > 0 and not results.error %}content-with-sidebar{% else %}container{% endif %}">
+        <header>
+            {% if results.error or results.topics | length == 0 %}
+            <a href="/" class="back-link">&larr; Upload another PDF</a>
+            {% endif %}
+            <h1>Resource Guide AI</h1>
+            <p class="subtitle">
+                AI Study Guide for: <strong>{{ filename }}</strong>
+                {% if results.gemini_powered %}
+                <span class="gemini-badge">Gemini 2.5</span>
+                {% endif %}
+                &middot; <a href="/playlist" class="playlist-link">Playlist <span class="playlist-badge" id="playlistBadge" style="display:none;">0</span></a>
+            </p>
+        </header>
+
+        <!-- Search bar -->
+        <div class="search-card card">
+            <form action="/search" method="get" class="search-form">
+                <div class="search-input-wrapper">
+                    <input type="text" name="q" class="search-input" placeholder="Search for more resources..." autocomplete="off">
+                    <button type="submit" class="btn btn-primary search-btn">Search</button>
+                </div>
+            </form>
+        </div>
+
+        {% if results.error %}
+        <div class="alert alert-error">{{ results.error }}</div>
+        {% elif results.topics | length == 0 %}
+        <div class="alert alert-error">No topics could be extracted from this PDF.</div>
+        {% else %}
+
+        {% if results.gemini_error %}
+        <div class="alert alert-error" style="margin-bottom: 1rem;">
+            Gemini AI was unavailable ({{ results.gemini_error }}). Showing RAG-only results.
+        </div>
+        {% endif %}
+
+        <!-- Summary Card -->
+        <div class="sg-summary-card card" id="sg-summary">
+            <div class="sg-summary-header">
+                <h2>Overview</h2>
+                {% if results.estimated_hours %}
+                <span class="sg-hours-badge">~{{ results.estimated_hours }}h study time</span>
+                {% endif %}
+            </div>
+            <p class="sg-summary-text">{{ results.summary }}</p>
+            <div class="sg-summary-stats">
+                <span class="sg-stat">
+                    <strong>{{ results.topics | length }}</strong> topic{{ "s" if results.topics | length != 1 else "" }}
+                </span>
+                {% set high_count = results.topics | selectattr("importance", "equalto", "high") | list | length %}
+                {% set med_count = results.topics | selectattr("importance", "equalto", "medium") | list | length %}
+                {% set low_count = results.topics | selectattr("importance", "equalto", "low") | list | length %}
+                {% if high_count %}
+                <span class="sg-stat sg-stat-high">{{ high_count }} high priority</span>
+                {% endif %}
+                {% if med_count %}
+                <span class="sg-stat sg-stat-med">{{ med_count }} medium</span>
+                {% endif %}
+                {% if low_count %}
+                <span class="sg-stat sg-stat-low">{{ low_count }} low</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Study Order -->
+        {% if results.study_order %}
+        <div class="sg-order-card card" id="sg-study-order">
+            <h3>Suggested Study Order</h3>
+            <ol class="sg-order-list">
+                {% for topic_name in results.study_order %}
+                <li>
+                    <a href="#sg-topic-{{ loop.index }}" class="sg-order-link" onclick="event.preventDefault(); document.getElementById('sg-topic-{{ loop.index }}')?.scrollIntoView({behavior:'smooth'})">
+                        {{ topic_name }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endif %}
+
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <div class="action-bar-left">
+                <div class="source-filters" id="sourceFilters"></div>
+            </div>
+            <div class="action-bar-right">
+                <button class="btn btn-secondary btn-sm" onclick="exportStudyGuide()">Export Study Guide</button>
+                <button class="btn btn-secondary btn-sm" onclick="addAllToPlaylist()">Add All to Playlist</button>
+            </div>
+        </div>
+
+        <!-- Topic Cards -->
+        {% for topic in results.topics %}
+        <div class="topic-card sg-topic-card" id="sg-topic-{{ loop.index }}">
+            <div class="topic-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <div class="topic-title">
+                    <span class="topic-number">{{ loop.index }}</span>
+                    <h2>{{ topic.name }}</h2>
+                    {% if topic.importance == "high" %}
+                    <span class="sg-importance-badge sg-importance-high">HIGH</span>
+                    {% elif topic.importance == "low" %}
+                    <span class="sg-importance-badge sg-importance-low">LOW</span>
+                    {% else %}
+                    <span class="sg-importance-badge sg-importance-med">MED</span>
+                    {% endif %}
+                </div>
+                <span class="toggle-icon">&#9660;</span>
+            </div>
+
+            <div class="topic-body">
+                {% if topic.description %}
+                <div class="sg-topic-description">{{ topic.description }}</div>
+                {% endif %}
+
+                {% if topic.study_tips %}
+                <div class="sg-study-tips">
+                    <strong>Study tip:</strong> {{ topic.study_tips }}
+                </div>
+                {% endif %}
+
+                {% if topic.resources | length > 0 %}
+                <div class="sg-resources-header">
+                    Matched Resources ({{ topic.resources | length }})
+                </div>
+                <div class="resources-list">
+                    {% for resource in topic.resources %}
+                    <div class="resource-item" onclick="openResource('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')">
+                        <div class="resource-icon">
+                            {% if resource.file_type == "video" %}VID
+                            {% elif resource.file_type == "pdf" %}PDF
+                            {% elif resource.file_type == "anki" %}ANK
+                            {% else %}DIR{% endif %}
+                        </div>
+                        <div class="resource-info">
+                            <div class="resource-name resource-link">{{ resource.filename }}</div>
+                            <div class="resource-meta">
+                                <span class="source-tag">{{ resource.source }}</span>
+                                {% if resource.subject %}
+                                <span class="subject-tag">{{ resource.subject }}</span>
+                                {% endif %}
+                                <span class="relevance-tag" title="Relevance score">
+                                    {{ (resource.relevance * 100) | round(0) | int }}%
+                                </span>
+                            </div>
+                            <div class="resource-path">{{ resource.relative_path }}</div>
+                            <div class="resource-tags" data-path="{{ resource.relative_path }}"></div>
+                        </div>
+                        <div class="resource-actions" onclick="event.stopPropagation()">
+                            <button class="action-icon" onclick="toggleBookmark('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Bookmark">&#9734;</button>
+                            <button class="action-icon" onclick="copyPath('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}')" title="Copy path">&#128203;</button>
+                            <button class="action-icon" onclick="addToPlaylist('{{ resource.relative_path | replace('\\', '\\\\') | replace("'", "\\'") }}', '{{ resource.filename | replace("'", "\\'") }}', '{{ resource.source | replace("'", "\\'") }}', '{{ resource.file_type }}', this)" title="Add to playlist">&#43;</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="no-results">No closely matching resources found for this topic.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% endif %}
+
+        <footer>
+            <a href="/">Home</a> &middot; <a href="/browse">Browse</a> &middot; <a href="/search">Search</a> &middot; <a href="/playlist">Playlist</a>
+        </footer>
+    </div>
+
+    <div class="copy-toast" id="copyToast">Copied!</div>
+
+    <script src="/static/shared.js"></script>
+    <script>
+    // Build source filter checkboxes
+    (function() {
+        const sources = new Set();
+        document.querySelectorAll('.source-tag').forEach(el => {
+            sources.add(el.textContent.trim());
+        });
+        const container = document.getElementById('sourceFilters');
+        if (container && sources.size > 1) {
+            sources.forEach(src => {
+                const label = document.createElement('label');
+                label.className = 'source-filter-label active';
+                label.dataset.source = src;
+                label.innerHTML = '<input type="checkbox" checked onchange="filterSourcesSG()">' + src;
+                container.appendChild(label);
+            });
+        }
+    })();
+
+    function filterSourcesSG() {
+        const labels = document.querySelectorAll('.source-filter-label');
+        const active = new Set();
+        labels.forEach(l => {
+            const cb = l.querySelector('input');
+            if (cb.checked) {
+                active.add(l.dataset.source);
+                l.classList.add('active');
+            } else {
+                l.classList.remove('active');
+            }
+        });
+        document.querySelectorAll('.resource-item').forEach(item => {
+            const srcTag = item.querySelector('.source-tag');
+            if (!srcTag) return;
+            const src = srcTag.textContent.trim();
+            item.style.display = active.has(src) ? '' : 'none';
+        });
+    }
+
+    // Sidebar scroll tracking
+    (function() {
+        const links = document.querySelectorAll('.sidebar-link');
+        const sections = [];
+        links.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href && href.startsWith('#')) {
+                const el = document.getElementById(href.slice(1));
+                if (el) sections.push({ link, el });
+            }
+        });
+        if (!sections.length) return;
+
+        sections.forEach(({ link, el }) => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (el.classList.contains('collapsed')) el.classList.remove('collapsed');
+            });
+        });
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    links.forEach(l => l.classList.remove('active'));
+                    const match = sections.find(s => s.el === entry.target);
+                    if (match) match.link.classList.add('active');
+                }
+            });
+        }, { rootMargin: '-20% 0px -60% 0px' });
+
+        sections.forEach(({ el }) => observer.observe(el));
+    })();
+
+    // Export study guide as text
+    function exportStudyGuide() {
+        let text = "AI STUDY GUIDE\n";
+        text += "Generated by Resource Guide AI\n";
+        text += "=" .repeat(40) + "\n\n";
+
+        const summary = document.querySelector('.sg-summary-text');
+        if (summary) text += summary.textContent.trim() + "\n\n";
+
+        const hours = document.querySelector('.sg-hours-badge');
+        if (hours) text += hours.textContent.trim() + "\n\n";
+
+        // Study order
+        const orderItems = document.querySelectorAll('.sg-order-list li');
+        if (orderItems.length) {
+            text += "STUDY ORDER:\n";
+            orderItems.forEach((li, i) => {
+                text += (i + 1) + ". " + li.textContent.trim() + "\n";
+            });
+            text += "\n";
+        }
+
+        // Topics
+        document.querySelectorAll('.sg-topic-card').forEach(card => {
+            const title = card.querySelector('.topic-title h2');
+            const badge = card.querySelector('.sg-importance-badge');
+            const desc = card.querySelector('.sg-topic-description');
+            const tips = card.querySelector('.sg-study-tips');
+
+            text += "-".repeat(40) + "\n";
+            if (title) text += title.textContent.trim();
+            if (badge) text += " [" + badge.textContent.trim() + "]";
+            text += "\n";
+            if (desc) text += desc.textContent.trim() + "\n";
+            if (tips) text += tips.textContent.trim() + "\n";
+
+            const resources = card.querySelectorAll('.resource-name');
+            if (resources.length) {
+                text += "\nResources:\n";
+                resources.forEach(r => {
+                    text += "  - " + r.textContent.trim() + "\n";
+                });
+            }
+            text += "\n";
+        });
+
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("Study guide copied to clipboard!");
+        }).catch(() => {
+            // Fallback: download as file
+            const blob = new Blob([text], { type: "text/plain" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "study_guide.txt";
+            a.click();
+        });
+    }
+
+    // Add all matched resources to playlist
+    function addAllToPlaylist() {
+        const items = document.querySelectorAll('.resource-item');
+        let added = 0;
+        items.forEach(item => {
+            const nameEl = item.querySelector('.resource-name');
+            const pathEl = item.querySelector('.resource-path');
+            const srcEl = item.querySelector('.source-tag');
+            const iconEl = item.querySelector('.resource-icon');
+            if (!nameEl || !pathEl) return;
+
+            const path = pathEl.textContent.trim();
+            const filename = nameEl.textContent.trim();
+            const source = srcEl ? srcEl.textContent.trim() : '';
+            const iconText = iconEl ? iconEl.textContent.trim() : '';
+            let fileType = 'file';
+            if (iconText === 'VID') fileType = 'video';
+            else if (iconText === 'PDF') fileType = 'pdf';
+            else if (iconText === 'ANK') fileType = 'anki';
+
+            // Use the shared addToPlaylist but silently
+            if (typeof _addToPlaylistSilent === 'function') {
+                _addToPlaylistSilent(path, filename, source, fileType);
+            } else {
+                addToPlaylist(path, filename, source, fileType);
+            }
+            added++;
+        });
+        showToast(added + " resources added to playlist");
+    }
+
+    // Load tags for visible resources
+    (function() {
+        const tagContainers = document.querySelectorAll('.resource-tags[data-path]');
+        if (tagContainers.length > 0) {
+            const paths = Array.from(tagContainers).map(el => el.dataset.path);
+            if (typeof loadTagsForPaths === 'function') loadTagsForPaths(paths);
+        }
+    })();
+    </script>
+</body>
+</html>

@@ -78,8 +78,18 @@
                     <input type="file" name="pdf" accept=".pdf" id="fileInput" multiple required>
                 </div>
                 <div class="file-name" id="fileName"></div>
+                {% if gemini_available %}
+                <div class="sg-toggle-row">
+                    <label class="sg-toggle-label">
+                        <input type="checkbox" id="useStudyGuide" checked onchange="toggleStudyGuideMode()">
+                        <span class="sg-toggle-switch"></span>
+                        <span>AI Study Guide <span class="gemini-badge">Gemini 2.5</span></span>
+                    </label>
+                    <span class="sg-toggle-hint">Get an AI-powered study plan with matched resources</span>
+                </div>
+                {% endif %}
                 <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
-                    Get Recommendations
+                    {% if gemini_available %}Generate AI Study Guide{% else %}Get Recommendations{% endif %}
                 </button>
             </form>
         </div>
@@ -107,7 +117,7 @@
 
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <p>Analyzing your PDFs and finding matching resources...</p>
+        <p id="loadingText">Analyzing your PDFs and finding matching resources...</p>
     </div>
 
     <script src="/static/shared.js"></script>

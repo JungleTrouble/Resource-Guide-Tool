@@ -51,6 +51,10 @@ KNOWN_SOURCES = {
     "Sketchy",
 }
 
+# Gemini API for AI Study Guide
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.5-flash"
+
 # Number of results per topic query
 RESULTS_PER_TOPIC = 10
 

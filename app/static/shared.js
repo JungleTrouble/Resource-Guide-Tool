@@ -316,6 +316,23 @@ function addToPlaylist(path, filename, source, fileType, btn) {
     _refreshPlaylistPanel();
 }
 
+function _addToPlaylistSilent(path, filename, source, fileType) {
+    migratePlaylistStorage();
+    let pl = getActivePlaylist();
+    if (!pl) {
+        const id = _generateId();
+        pl = { id: id, code: null, name: 'My Playlist', description: '', resources: [], createdAt: Date.now() };
+        const all = getAllPlaylists();
+        all.push(pl);
+        _saveAllPlaylists(all);
+        setActivePlaylistId(id);
+    }
+    if (pl.resources.some(r => r.path === path)) return; // skip if already in playlist
+    pl.resources.push({ path, filename, source, fileType });
+    pl.code = null;
+    savePlaylistRaw(pl);
+}
+
 function removeFromPlaylist(path) {
     const pl = getActivePlaylist();
     if (!pl) return;
