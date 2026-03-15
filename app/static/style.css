@@ -1649,6 +1649,125 @@ body:not(.dark) .loading-overlay {
     padding: 0.15rem;
 }
 
+/* === NotebookLM Workflow Bridge === */
+
+.btn-notebooklm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--accent), #6366f1);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+}
+
+.btn-notebooklm:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.notebooklm-icon {
+    font-size: 0.9rem;
+}
+
+/* NotebookLM Modal */
+.nlm-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.nlm-modal {
+    background: var(--card-bg);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.nlm-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, var(--accent), #6366f1);
+    color: #fff;
+}
+
+.nlm-modal-title {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.nlm-modal-close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.8;
+}
+
+.nlm-modal-close:hover {
+    opacity: 1;
+}
+
+.nlm-modal-body {
+    padding: 1.25rem;
+}
+
+.nlm-step {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+}
+
+.nlm-summary {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.nlm-stat {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.nlm-prompt-box {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.7rem;
+    font-family: monospace;
+    resize: vertical;
+    margin-top: 0.5rem;
+}
+
 /* Mobile panels */
 @media (max-width: 640px) {
     .panel-slide {

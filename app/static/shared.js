@@ -946,6 +946,10 @@ function _renderPlaylistPanel() {
         '<input class="panel-code-input" id="panelCodeInput" placeholder="Paste share code..." maxlength="8">' +
         '<button class="btn btn-primary btn-sm" onclick="panelLoadCode()">Load</button>' +
     '</div>';
+    // NotebookLM button (below code row)
+    headerHtml += '<button class="btn btn-notebooklm" onclick="exportToNotebookLM()" title="Generate a Claude Code prompt to create a NotebookLM study notebook from your playlist">' +
+        '<span class="notebooklm-icon">&#128218;</span> Study with NotebookLM' +
+    '</button>';
     header.innerHTML = headerHtml;
 
     // Body: resource list
@@ -1030,6 +1034,70 @@ function panelLoadCode() {
             }).join('') + '</div>';
         })
         .catch(() => showToast('Could not load playlist', 2000));
+}
+
+
+// === NotebookLM Workflow Bridge ===
+
+function exportToNotebookLM() {
+    const pl = getActivePlaylist();
+    if (!pl || !pl.resources || pl.resources.length === 0) {
+        showToast('Add resources to your playlist first', 2000);
+        return;
+    }
+
+    fetch('/api/notebooklm/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            playlist_name: pl.name || 'Study Playlist',
+            resources: pl.resources,
+        }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { showToast(data.error, 2000); return; }
+        // Copy the prompt to clipboard
+        navigator.clipboard.writeText(data.prompt).then(() => {
+            _showNotebookLMModal(data);
+        }).catch(() => {
+            // Fallback: show the prompt in a modal for manual copy
+            _showNotebookLMModal(data);
+        });
+    })
+    .catch(() => showToast('Could not generate NotebookLM prompt', 2000));
+}
+
+function _showNotebookLMModal(data) {
+    // Remove existing modal if any
+    const existing = document.getElementById('notebooklmModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'notebooklmModal';
+    modal.className = 'nlm-modal-backdrop';
+    modal.innerHTML =
+        '<div class="nlm-modal">' +
+            '<div class="nlm-modal-header">' +
+                '<span class="nlm-modal-title">Study with NotebookLM</span>' +
+                '<button class="nlm-modal-close" onclick="document.getElementById(\'notebooklmModal\').remove()">&times;</button>' +
+            '</div>' +
+            '<div class="nlm-modal-body">' +
+                '<p class="nlm-step"><strong>Step 1:</strong> The prompt has been copied to your clipboard.</p>' +
+                '<p class="nlm-step"><strong>Step 2:</strong> Open Claude Code and paste the prompt.</p>' +
+                '<p class="nlm-step"><strong>Step 3:</strong> Claude will use NotebookLM MCP to create your study notebook with Gemini 2.5.</p>' +
+                '<div class="nlm-summary">' +
+                    '<div class="nlm-stat">' + data.resource_count + ' resources</div>' +
+                    '<div class="nlm-stat">' + data.sources.join(', ') + '</div>' +
+                '</div>' +
+                '<textarea class="nlm-prompt-box" readonly onclick="this.select()">' + data.prompt + '</textarea>' +
+                '<button class="btn btn-primary" style="width:100%;margin-top:0.5rem;" onclick="navigator.clipboard.writeText(document.querySelector(\'.nlm-prompt-box\').value);showToast(\'Prompt copied!\',1500);">Copy Prompt</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) modal.remove();
+    });
 }
 
 

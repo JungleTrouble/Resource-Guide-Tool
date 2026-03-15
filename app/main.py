@@ -22,6 +22,7 @@ from app.embeddings import (
     get_resources_by_source_subject,
     get_source_counts,
     index_resources,
+    query_similar,
 )
 from app.indexer import scan_resources
 from app.recommender import recommend, recommend_multi, search_resources
@@ -527,3 +528,60 @@ async def browse_resources_api(source: str = "", subject: str = ""):
         return JSONResponse({"error": "source and subject are required"}, status_code=400)
     resources = get_resources_by_source_subject(source, subject)
     return JSONResponse(resources)
+
+
+# === NotebookLM Workflow Bridge ===
+
+
+class NotebookLMExport(BaseModel):
+    """Request body for NotebookLM export."""
+    playlist_name: str = ""
+    resources: list[dict] = []
+
+
+@app.post("/api/notebooklm/export")
+async def notebooklm_export(data: NotebookLMExport):
+    """Format playlist resources for NotebookLM notebook creation.
+
+    Accepts a playlist (name + resources) and returns a structured prompt
+    that can be used with the NotebookLM MCP to create a study notebook.
+    """
+    if not data.resources:
+        return JSONResponse({"error": "No resources to export"}, status_code=400)
+
+    name = data.playlist_name.strip() or "Study Playlist"
+
+    # Group resources by source for a clean summary
+    by_source: dict[str, list[dict]] = {}
+    for r in data.resources:
+        src = r.get("source", "Unknown")
+        if src not in by_source:
+            by_source[src] = []
+        by_source[src].append(r)
+
+    # Build a content summary for NotebookLM
+    lines = [f"# {name}", ""]
+    for source, items in sorted(by_source.items()):
+        lines.append(f"## {source} ({len(items)} resources)")
+        for item in items:
+            fname = item.get("filename", "Unknown")
+            ftype = item.get("fileType", "")
+            lines.append(f"- [{ftype.upper()}] {fname}")
+        lines.append("")
+
+    content_summary = "\n".join(lines)
+
+    # Build the Claude Code prompt
+    prompt = (
+        f"Create a NotebookLM notebook called \"{name}\" and add these study resources as context. "
+        f"The notebook should help me study these {len(data.resources)} medical resources:\n\n"
+        f"{content_summary}\n"
+        f"After creating the notebook, ask it to generate a study guide overview."
+    )
+
+    return JSONResponse({
+        "prompt": prompt,
+        "content_summary": content_summary,
+        "resource_count": len(data.resources),
+        "sources": list(by_source.keys()),
+    })
