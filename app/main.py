@@ -209,6 +209,11 @@ async def run_indexing():
     """Start indexing in a background thread and return immediately."""
     global _indexing_state
 
+    # On cloud, the pre-built index is baked into the Docker image.
+    # Re-indexing would delete it and find 0 local resource files.
+    if IS_CLOUD:
+        return JSONResponse({"status": "blocked", "message": "Re-indexing is disabled on cloud. The pre-built index is used."})
+
     if _indexing_state["running"]:
         return JSONResponse({"status": "already_running"})
 
